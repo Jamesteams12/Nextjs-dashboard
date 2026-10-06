@@ -6,6 +6,7 @@ import { redirect } from 'next/navigation';
 import postgres from 'postgres';
 import { AuthError } from 'next-auth';
 import { signIn } from '@/auth';
+import { createClient, getCurrentSupabaseUserId } from '@/app/lib/supabase/server';
 
 const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
 
@@ -132,4 +133,111 @@ export async function authenticate(
     }
     throw error;
   }
+}
+
+const PatientSchema = z.object({
+  full_name: z.string().min(1, { message: 'Please enter the patient\'s full name.' }),
+  phone: z.string().optional(),
+  date_of_birth: z.string().optional(),
+});
+
+export type PatientState = {
+  errors?: {
+    full_name?: string[];
+    phone?: string[];
+    date_of_birth?: string[];
+  };
+  message?: string | null;
+};
+
+export async function createPatient(prevState: PatientState, formData: FormData) {
+  const validated = PatientSchema.safeParse({
+    full_name: formData.get('full_name'),
+    phone: formData.get('phone'),
+    date_of_birth: formData.get('date_of_birth'),
+  });
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Missing fields. Failed to create patient.',
+    };
+  }
+
+  const { full_name, phone, date_of_birth } = validated.data;
+  const supabase = createClient();
+  const userId = await getCurrentSupabaseUserId();
+
+  const { error } = await supabase.from('patients').insert({
+    user_id: userId,
+    full_name,
+    phone: phone || null,
+    date_of_birth: date_of_birth || null,
+  });
+
+  if (error) {
+    console.error('Supabase error:', error);
+    return { message: `Database error ${error.code}: failed to create patient.` };
+  }
+
+  revalidatePath('/dashboard/patients');
+  redirect('/dashboard/patients');
+}
+
+export async function updatePatient(
+  id: string,
+  prevState: PatientState,
+  formData: FormData,
+) {
+  const validated = PatientSchema.safeParse({
+    full_name: formData.get('full_name'),
+    phone: formData.get('phone'),
+    date_of_birth: formData.get('date_of_birth'),
+  });
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Missing fields. Failed to update patient.',
+    };
+  }
+
+  const { full_name, phone, date_of_birth } = validated.data;
+  const supabase = createClient();
+  const userId = await getCurrentSupabaseUserId();
+
+  const { error } = await supabase
+    .from('patients')
+    .update({
+      full_name,
+      phone: phone || null,
+      date_of_birth: date_of_birth || null,
+      user_id: userId,
+    })
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Supabase error:', error);
+    return { message: `Database error ${error.code}: failed to update patient.` };
+  }
+
+  revalidatePath('/dashboard/patients');
+  redirect('/dashboard/patients');
+}
+
+export async function deletePatient(id: string) {
+  const supabase = createClient();
+  const userId = await getCurrentSupabaseUserId();
+
+  const { error } = await supabase
+    .from('patients')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw new Error(`Database error ${error.code}: failed to delete patient.`);
+  }
+
+  revalidatePath('/dashboard/patients');
 }
