@@ -1,6 +1,6 @@
 # Family Clinic Dashboard
 
-**Deployed base**: https://<your-app>.vercel.app
+**Deployed base**: https://nextjs-dashboard-nine-theta-d8vctthkcs.vercel.app
 **Repo**: https://github.com/<you>/<repo>
 **Student**: <your name>
 
