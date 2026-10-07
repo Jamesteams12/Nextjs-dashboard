@@ -1,9 +1,11 @@
 import { fetchPatients } from '@/app/lib/data';
 import { CreatePatient, UpdatePatient, DeletePatient } from '@/app/ui/patients/buttons';
 import { lusitana } from '@/app/ui/fonts';
+import { auth } from '@/auth';
 
 export default async function Page() {
-  const patients = await fetchPatients();
+  const [patients, session] = await Promise.all([fetchPatients(), auth()]);
+  const canDeletePatients = session?.user?.role === 'owner';
 
   return (
     <div className="w-full">
@@ -33,7 +35,7 @@ export default async function Page() {
                 <td className="whitespace-nowrap py-3 pl-6 pr-3">
                   <div className="flex justify-end gap-3">
                     <UpdatePatient id={p.id} />
-                    <DeletePatient id={p.id} />
+                    {canDeletePatients && <DeletePatient id={p.id} />}
                   </div>
                 </td>
               </tr>

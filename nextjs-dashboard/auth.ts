@@ -6,7 +6,10 @@ import type { User } from '@/app/lib/definitions';
 import bcrypt from 'bcrypt';
 import postgres from 'postgres';
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+const sql = postgres(process.env.POSTGRES_URL!, {
+  ssl: 'require',
+  prepare: false,
+});
 
 async function getUser(email: string): Promise<User | undefined> {
   try {
@@ -29,17 +32,6 @@ export const { auth, signIn, signOut } = NextAuth({
       }
       return token;
     },
-    async session({ session, token }) {
-      if (session.user && token.id) {
-        session.user.id = token.id as string;
-      }
-
-      if (session.user && token.role) {
-        session.user.role = token.role as 'owner' | 'front_desk';
-      }
-
-      return session;
-    },
   },
   providers: [
     Credentials({
@@ -50,11 +42,14 @@ export const { auth, signIn, signOut } = NextAuth({
 
         if (parsedCredentials.success) {
           const { email, password } = parsedCredentials.data;
-          const user = await getUser(email);
+          const user = await getUser(email.trim().toLowerCase());
           if (!user) return null;
 
           const passwordsMatch = await bcrypt.compare(password, user.password);
-          if (passwordsMatch) {
+          if (
+            passwordsMatch &&
+            (user.role === 'owner' || user.role === 'front_desk')
+          ) {
             return {
               id: user.id,
               name: user.name,

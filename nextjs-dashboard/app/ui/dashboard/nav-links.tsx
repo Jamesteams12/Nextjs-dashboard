@@ -17,12 +17,11 @@ const links = [
   { name: 'Tomorrow', href: '/dashboard/tomorrow', icon: ClockIcon },
 ];
 
-export default function NavLinks() {
+export default function NavLinks({ isOwner }: { isOwner: boolean }) {
   const pathname = usePathname();
-
   return (
     <>
-      {links.map((link) => {
+      {links.filter((link) => isOwner || link.href !== '/dashboard').map((link) => {
         const LinkIcon = link.icon;
         return (
           <Link

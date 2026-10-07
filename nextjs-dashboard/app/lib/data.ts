@@ -10,7 +10,10 @@ import {
 import { formatCurrency } from './utils';
 import { createClient, getCurrentSupabaseUserId } from '@/app/lib/supabase/server';
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+const sql = postgres(process.env.POSTGRES_URL!, {
+  ssl: 'require',
+  prepare: false,
+});
 
 export async function fetchRevenue() {
   try {

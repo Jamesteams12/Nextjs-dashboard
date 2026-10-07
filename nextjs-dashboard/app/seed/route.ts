@@ -2,7 +2,10 @@ import bcrypt from 'bcrypt';
 import postgres from 'postgres';
 import { invoices, customers, revenue, users } from '../lib/placeholder-data';
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+const sql = postgres(process.env.POSTGRES_URL!, {
+  ssl: 'require',
+  prepare: false,
+});
 
 async function seedUsers() {
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
@@ -15,19 +18,23 @@ async function seedUsers() {
       role VARCHAR(20) NOT NULL DEFAULT 'owner'
     );
   `;
+  await sql`
+    ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'owner';
+  `;
 
-  const insertedUsers = await Promise.all(
-    users.map(async (user) => {
-      const hashedPassword = await bcrypt.hash(user.password, 10);
-      return sql`
+  for (const user of users) {
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+    await sql`
         INSERT INTO users (id, name, email, password, role)
         VALUES (${user.id}, ${user.name}, ${user.email}, ${hashedPassword}, ${user.role})
-        ON CONFLICT (id) DO NOTHING;
+        ON CONFLICT (id) DO UPDATE
+        SET name = EXCLUDED.name,
+            email = EXCLUDED.email,
+            password = EXCLUDED.password,
+            role = EXCLUDED.role;
       `;
-    }),
-  );
-
-  return insertedUsers;
+  }
 }
 
 async function seedInvoices() {
@@ -104,15 +111,17 @@ async function seedRevenue() {
 
 export async function GET() {
   try {
-    const result = await sql.begin((sql) => [
-      seedUsers(),
-      seedCustomers(),
-      seedInvoices(),
-      seedRevenue(),
-    ]);
+    await seedUsers();
+    await seedCustomers();
+    await seedInvoices();
+    await seedRevenue();
 
     return Response.json({ message: 'Database seeded successfully' });
   } catch (error) {
-    return Response.json({ error }, { status: 500 });
+    console.error('Database seed failed:', error);
+    return Response.json(
+      { error: 'Database seed failed. Check the server logs for details.' },
+      { status: 500 },
+    );
   }
 }

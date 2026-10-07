@@ -1,32 +1,57 @@
 import type { NextAuthConfig } from 'next-auth';
 
-const allowedDashboardPaths = ['/dashboard', '/dashboard/patients', '/dashboard/appointments', '/dashboard/tomorrow'];
+const frontDeskDashboardPaths = [
+  '/dashboard/patients',
+  '/dashboard/appointments',
+  '/dashboard/tomorrow',
+];
 
 export const authConfig = {
   pages: {
     signIn: '/login',
   },
   callbacks: {
+    async session({ session, token }) {
+      if (session.user) {
+        const userId =
+          typeof token.id === 'string' ? token.id : token.sub;
+        if (typeof userId === 'string') session.user.id = userId;
+        if (token.role === 'owner') {
+          session.user.role = 'owner';
+        } else if (token.role === 'front_desk') {
+          session.user.role = 'front_desk';
+        }
+      }
+      return session;
+    },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
       const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
-      const isAllowedDashboardPath = allowedDashboardPaths.some((path) => {
-        if (path === '/dashboard') {
-          return nextUrl.pathname === path || nextUrl.pathname === '/dashboard/';
-        }
+      const isFrontDeskPath = frontDeskDashboardPaths.some((path) => {
         return nextUrl.pathname === path || nextUrl.pathname.startsWith(`${path}/`);
       });
-      const role = auth?.user?.role as 'owner' | 'front_desk' | undefined;
+      const role = auth?.user?.role;
 
       if (isOnDashboard) {
         if (!isLoggedIn) return false;
 
         if (role === 'owner') return true;
 
-        return isAllowedDashboardPath;
+        if (role === 'front_desk') {
+          if (nextUrl.pathname === '/dashboard' || nextUrl.pathname === '/dashboard/') {
+            return Response.redirect(new URL('/dashboard/patients', nextUrl));
+          }
+          if (isFrontDeskPath) return true;
+          return Response.redirect(new URL('/dashboard/patients', nextUrl));
+        }
+
+        return false;
       }
 
       if (isLoggedIn) {
+        if (role === 'front_desk') {
+          return Response.redirect(new URL('/dashboard/patients', nextUrl));
+        }
         return Response.redirect(new URL('/dashboard', nextUrl));
       }
 

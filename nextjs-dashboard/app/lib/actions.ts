@@ -5,10 +5,13 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import postgres from 'postgres';
 import { AuthError } from 'next-auth';
-import { signIn } from '@/auth';
-import { createClient, getCurrentSupabaseUserId } from '@/app/lib/supabase/server';
+import { auth, signIn } from '@/auth';
+import { createClient } from '@/app/lib/supabase/server';
 
-const sql = postgres(process.env.POSTGRES_URL!, { ssl: 'require' });
+const sql = postgres(process.env.POSTGRES_URL!, {
+  ssl: 'require',
+  prepare: false,
+});
 
 const FormSchema = z.object({
     id: z.string(),
@@ -156,7 +159,20 @@ export type PatientState = {
   message?: string | null;
 };
 
+async function requirePatientEditor() {
+  const session = await auth();
+  const role = session?.user?.role;
+  const userId = session?.user?.id;
+
+  if (!userId || (role !== 'owner' && role !== 'front_desk')) {
+    throw new Error('You must be signed in with a clinic staff account.');
+  }
+
+  return { role, userId };
+}
+
 export async function createPatient(prevState: PatientState, formData: FormData) {
+  const { userId } = await requirePatientEditor();
   const validated = PatientSchema.safeParse({
     full_name: formData.get('full_name'),
     phone: formData.get('phone'),
@@ -168,10 +184,8 @@ export async function createPatient(prevState: PatientState, formData: FormData)
       message: 'Missing fields. Failed to create patient.',
     };
   }
-
   const { full_name, phone, date_of_birth } = validated.data;
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
 
   const { error } = await supabase.from('patients').insert({
     user_id: userId,
@@ -194,6 +208,7 @@ export async function updatePatient(
   prevState: PatientState,
   formData: FormData,
 ) {
+  const { userId } = await requirePatientEditor();
   const validated = PatientSchema.safeParse({
     full_name: formData.get('full_name'),
     phone: formData.get('phone'),
@@ -205,10 +220,8 @@ export async function updatePatient(
       message: 'Missing fields. Failed to update patient.',
     };
   }
-
   const { full_name, phone, date_of_birth } = validated.data;
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
 
   const { error } = await supabase
     .from('patients')
@@ -231,8 +244,12 @@ export async function updatePatient(
 }
 
 export async function deletePatient(id: string) {
+  const { role, userId } = await requirePatientEditor();
+  if (role !== 'owner') {
+    throw new Error('Only the clinic owner can delete patients.');
+  }
+
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
 
   const { error } = await supabase
     .from('patients')
