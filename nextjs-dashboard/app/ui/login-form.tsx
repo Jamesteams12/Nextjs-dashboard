@@ -26,6 +26,14 @@ export default function LoginForm() {
         <h1 className={`${lusitana.className} mb-3 text-2xl`}>
           Please log in to continue.
         </h1>
+        <div className="mb-4 space-y-1 text-sm text-gray-600">
+          <p>
+            Owner demo: <span className="font-medium text-gray-900">owner@nextmail.com</span> / <span className="font-medium text-gray-900">123456</span>
+          </p>
+          <p>
+            Front desk demo: <span className="font-medium text-gray-900">frontdesk@nextmail.com</span> / <span className="font-medium text-gray-900">frontdesk123</span>
+          </p>
+        </div>
         <div className="w-full">
           <div>
             <label
@@ -40,7 +48,9 @@ export default function LoginForm() {
                 id="email"
                 type="email"
                 name="email"
+                autoComplete="email"
                 placeholder="Enter your email address"
+                defaultValue="owner@nextmail.com"
                 required
               />
               <AtSymbolIcon className="pointer-events-none absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-gray-500 peer-focus:text-gray-900" />
@@ -59,7 +69,9 @@ export default function LoginForm() {
                 id="password"
                 type="password"
                 name="password"
+                autoComplete="current-password"
                 placeholder="Enter password"
+                defaultValue="123456"
                 required
                 minLength={6}
               />

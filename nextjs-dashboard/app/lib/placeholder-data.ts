@@ -3,9 +3,17 @@
 const users = [
   {
     id: '410544b2-4001-4271-9855-fec4b6a6442a',
-    name: 'User',
-    email: 'user@nextmail.com',
+    name: 'Owner',
+    email: 'owner@nextmail.com',
     password: '123456',
+    role: 'owner',
+  },
+  {
+    id: '6f26a2d8-3f8d-44a9-9d52-3d7f4b0d7c7f',
+    name: 'Front Desk',
+    email: 'frontdesk@nextmail.com',
+    password: 'frontdesk123',
+    role: 'front_desk',
   },
 ];
 
