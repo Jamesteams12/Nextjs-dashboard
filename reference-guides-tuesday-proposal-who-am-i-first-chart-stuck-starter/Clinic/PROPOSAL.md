@@ -2,7 +2,7 @@
 
 **Deployed base**: https://nextjs-dashboard-nine-theta-d8vctthkcs.vercel.app
 **Repo**: https://github.com/<you>/<repo>
-**Student**: <your name>
+**Student**: Tj
 
 ## 1. Domain
 A small family practice with one owner and two front-desk staff.
