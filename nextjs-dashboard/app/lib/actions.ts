@@ -107,8 +107,6 @@ export async function updateInvoice(
 }
 
 export async function deleteInvoice(id: string) {
-    throw new Error('Failed to Delete Invoice');
-
     await sql`
         DELETE FROM invoices
         WHERE id = ${id}
@@ -121,7 +119,15 @@ export async function authenticate(
   formData: FormData,
 ) {
   try {
-    await signIn('credentials', formData);
+    const email = formData.get('email');
+    const password = formData.get('password');
+    const redirectTo = formData.get('redirectTo')?.toString() ?? '/dashboard';
+
+    await signIn('credentials', {
+      email,
+      password,
+      redirectTo,
+    });
   } catch (error) {
     if (error instanceof AuthError) {
       switch (error.type) {
