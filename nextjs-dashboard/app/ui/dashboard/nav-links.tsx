@@ -4,9 +4,7 @@ import {
   CalendarDaysIcon,
   ClockIcon,
   HomeIcon,
-  BanknotesIcon,
   UserGroupIcon,
-  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -15,8 +13,6 @@ import clsx from 'clsx';
 const links = [
   { name: 'Overview', href: '/dashboard', icon: HomeIcon, ownerOnly: true },
   { name: 'Patients', href: '/dashboard/patients', icon: UserGroupIcon, ownerOnly: false },
-  { name: 'Customers', href: '/dashboard/customers', icon: UserCircleIcon, ownerOnly: true },
-  { name: 'Invoices', href: '/dashboard/invoices', icon: BanknotesIcon, ownerOnly: true },
   { name: 'Appointments', href: '/dashboard/appointments', icon: CalendarDaysIcon, ownerOnly: false },
   { name: 'Tomorrow', href: '/dashboard/tomorrow', icon: ClockIcon, ownerOnly: false },
 ];
