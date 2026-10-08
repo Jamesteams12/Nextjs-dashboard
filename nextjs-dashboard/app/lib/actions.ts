@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 import postgres from 'postgres';
 import { AuthError } from 'next-auth';
 import { auth, signIn } from '@/auth';
-import { createClient } from '@/app/lib/supabase/server';
+import { createClient, getPatientOwnerId } from '@/app/lib/supabase/server';
 
 const sql = postgres(process.env.POSTGRES_URL!, {
   ssl: 'require',
@@ -150,11 +150,45 @@ const PatientSchema = z.object({
   date_of_birth: z.string().optional(),
 });
 
+function isValidAppointmentDateTime(value: string) {
+  const timestamp = new Date(`${value}:00+02:00`);
+  return (
+    !Number.isNaN(timestamp.getTime()) &&
+    new Date(timestamp.getTime() + 2 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 16) === value
+  );
+}
+
+const AppointmentSchema = z.object({
+  patient_id: z.string().uuid({ message: 'Please select a patient.' }),
+  starts_at: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, {
+      message: 'Please enter a valid appointment date and time.',
+    })
+    .refine(isValidAppointmentDateTime, {
+      message: 'Please enter a valid appointment date and time.',
+    }),
+  status: z.enum(['booked', 'done', 'no_show'], {
+    message: 'Please select a valid appointment status.',
+  }),
+});
+
 export type PatientState = {
   errors?: {
     full_name?: string[];
     phone?: string[];
     date_of_birth?: string[];
+  };
+  message?: string | null;
+};
+
+export type AppointmentState = {
+  errors?: {
+    patient_id?: string[];
+    starts_at?: string[];
+    status?: string[];
   };
   message?: string | null;
 };
@@ -171,8 +205,154 @@ async function requirePatientEditor() {
   return { role, userId };
 }
 
+async function requireClinicPatient(patientId: string, patientOwnerId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('patients')
+    .select('id')
+    .eq('id', patientId)
+    .eq('user_id', patientOwnerId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Supabase error checking appointment patient:', error);
+    throw new Error(`Database error ${error.code}: failed to verify patient.`);
+  }
+
+  return data !== null;
+}
+
+function appointmentTimestamp(dateTimeLocal: string) {
+  return new Date(`${dateTimeLocal}:00+02:00`).toISOString();
+}
+
+export async function createAppointment(
+  prevState: AppointmentState,
+  formData: FormData,
+): Promise<AppointmentState> {
+  const { role, userId } = await requirePatientEditor();
+  const patientOwnerId = await getPatientOwnerId(role, userId);
+  const validated = AppointmentSchema.safeParse({
+    patient_id: formData.get('patient_id'),
+    starts_at: formData.get('starts_at'),
+    status: formData.get('status'),
+  });
+
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Check the appointment details and try again.',
+    };
+  }
+
+  if (!(await requireClinicPatient(validated.data.patient_id, patientOwnerId))) {
+    return {
+      errors: { patient_id: ['Select a patient from this clinic.'] },
+      message: 'Failed to create appointment.',
+    };
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase.from('appointments').insert({
+    user_id: patientOwnerId,
+    patient_id: validated.data.patient_id,
+    starts_at: appointmentTimestamp(validated.data.starts_at),
+    status: validated.data.status,
+  });
+
+  if (error) {
+    console.error('Supabase error:', error);
+    return { message: `Database error ${error.code}: failed to create appointment.` };
+  }
+
+  revalidatePath('/dashboard/appointments');
+  revalidatePath('/dashboard/tomorrow');
+  revalidatePath('/dashboard');
+  redirect('/dashboard/appointments');
+}
+
+export async function updateAppointment(
+  id: string,
+  prevState: AppointmentState,
+  formData: FormData,
+): Promise<AppointmentState> {
+  const { role, userId } = await requirePatientEditor();
+  const patientOwnerId = await getPatientOwnerId(role, userId);
+  const validated = AppointmentSchema.safeParse({
+    patient_id: formData.get('patient_id'),
+    starts_at: formData.get('starts_at'),
+    status: formData.get('status'),
+  });
+
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Check the appointment details and try again.',
+    };
+  }
+
+  if (!(await requireClinicPatient(validated.data.patient_id, patientOwnerId))) {
+    return {
+      errors: { patient_id: ['Select a patient from this clinic.'] },
+      message: 'Failed to update appointment.',
+    };
+  }
+
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('appointments')
+    .update({
+      patient_id: validated.data.patient_id,
+      starts_at: appointmentTimestamp(validated.data.starts_at),
+      status: validated.data.status,
+    })
+    .eq('id', id)
+    .eq('user_id', patientOwnerId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    console.error('Supabase error:', error);
+    return { message: `Database error ${error.code}: failed to update appointment.` };
+  }
+  if (!data) {
+    return { message: 'Appointment not found for this clinic.' };
+  }
+
+  revalidatePath('/dashboard/appointments');
+  revalidatePath('/dashboard/tomorrow');
+  revalidatePath('/dashboard');
+  redirect('/dashboard/appointments');
+}
+
+export async function deleteAppointment(id: string) {
+  const { role, userId } = await requirePatientEditor();
+  const patientOwnerId = await getPatientOwnerId(role, userId);
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('appointments')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', patientOwnerId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw new Error(`Database error ${error.code}: failed to delete appointment.`);
+  }
+  if (!data) {
+    throw new Error('Appointment not found for this clinic.');
+  }
+
+  revalidatePath('/dashboard/appointments');
+  revalidatePath('/dashboard/tomorrow');
+  revalidatePath('/dashboard');
+}
+
 export async function createPatient(prevState: PatientState, formData: FormData) {
-  const { userId } = await requirePatientEditor();
+  const { role, userId } = await requirePatientEditor();
+  const patientOwnerId = await getPatientOwnerId(role, userId);
   const validated = PatientSchema.safeParse({
     full_name: formData.get('full_name'),
     phone: formData.get('phone'),
@@ -188,7 +368,7 @@ export async function createPatient(prevState: PatientState, formData: FormData)
   const supabase = createClient();
 
   const { error } = await supabase.from('patients').insert({
-    user_id: userId,
+    user_id: patientOwnerId,
     full_name,
     phone: phone || null,
     date_of_birth: date_of_birth || null,
@@ -208,7 +388,8 @@ export async function updatePatient(
   prevState: PatientState,
   formData: FormData,
 ) {
-  const { userId } = await requirePatientEditor();
+  const { role, userId } = await requirePatientEditor();
+  const patientOwnerId = await getPatientOwnerId(role, userId);
   const validated = PatientSchema.safeParse({
     full_name: formData.get('full_name'),
     phone: formData.get('phone'),
@@ -229,10 +410,10 @@ export async function updatePatient(
       full_name,
       phone: phone || null,
       date_of_birth: date_of_birth || null,
-      user_id: userId,
+      user_id: patientOwnerId,
     })
     .eq('id', id)
-    .eq('user_id', userId);
+    .eq('user_id', patientOwnerId);
 
   if (error) {
     console.error('Supabase error:', error);
@@ -248,6 +429,7 @@ export async function deletePatient(id: string) {
   if (role !== 'owner') {
     throw new Error('Only the clinic owner can delete patients.');
   }
+  const patientOwnerId = await getPatientOwnerId(role, userId);
 
   const supabase = createClient();
 
@@ -255,7 +437,7 @@ export async function deletePatient(id: string) {
     .from('patients')
     .delete()
     .eq('id', id)
-    .eq('user_id', userId);
+    .eq('user_id', patientOwnerId);
 
   if (error) {
     console.error('Supabase error:', error);
