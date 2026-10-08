@@ -4,24 +4,28 @@ import {
   CalendarDaysIcon,
   ClockIcon,
   HomeIcon,
+  BanknotesIcon,
   UserGroupIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
 
 const links = [
-  { name: 'Overview', href: '/dashboard', icon: HomeIcon },
-  { name: 'Patients', href: '/dashboard/patients', icon: UserGroupIcon },
-  { name: 'Appointments', href: '/dashboard/appointments', icon: CalendarDaysIcon },
-  { name: 'Tomorrow', href: '/dashboard/tomorrow', icon: ClockIcon },
+  { name: 'Overview', href: '/dashboard', icon: HomeIcon, ownerOnly: true },
+  { name: 'Patients', href: '/dashboard/patients', icon: UserGroupIcon, ownerOnly: false },
+  { name: 'Customers', href: '/dashboard/customers', icon: UserCircleIcon, ownerOnly: true },
+  { name: 'Invoices', href: '/dashboard/invoices', icon: BanknotesIcon, ownerOnly: true },
+  { name: 'Appointments', href: '/dashboard/appointments', icon: CalendarDaysIcon, ownerOnly: false },
+  { name: 'Tomorrow', href: '/dashboard/tomorrow', icon: ClockIcon, ownerOnly: false },
 ];
 
 export default function NavLinks({ isOwner }: { isOwner: boolean }) {
   const pathname = usePathname();
   return (
     <>
-      {links.filter((link) => isOwner || link.href !== '/dashboard').map((link) => {
+      {links.filter((link) => !link.ownerOnly || isOwner).map((link) => {
         const LinkIcon = link.icon;
         return (
           <Link

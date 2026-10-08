@@ -5,6 +5,7 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import { lusitana } from '@/app/ui/fonts';
+import { fetchClinicMetrics } from '@/app/lib/data';
 
 const iconMap = {
   patients: UserGroupIcon,
@@ -13,20 +14,15 @@ const iconMap = {
   tomorrow: ClockIcon,
 };
 
-const clinicMetrics = {
-  patients: { title: 'New patients', value: 16 },
-  appointments: { title: 'Booked this week', value: 42 },
-  noShows: { title: 'No-shows', value: '6%' },
-  tomorrow: { title: 'Tomorrow', value: 9 },
-};
-
 export default async function CardWrapper() {
+  const metrics = await fetchClinicMetrics();
+
   return (
     <>
-      <Card title={clinicMetrics.patients.title} value={clinicMetrics.patients.value} type="patients" />
-      <Card title={clinicMetrics.appointments.title} value={clinicMetrics.appointments.value} type="appointments" />
-      <Card title={clinicMetrics.noShows.title} value={clinicMetrics.noShows.value} type="noShows" />
-      <Card title={clinicMetrics.tomorrow.title} value={clinicMetrics.tomorrow.value} type="tomorrow" />
+      <Card title="New patients this month" value={metrics.newPatients} type="patients" />
+      <Card title="Booked this week" value={metrics.bookedThisWeek} type="appointments" />
+      <Card title="No-shows this month" value={metrics.noShowsThisMonth} type="noShows" />
+      <Card title="Appointments tomorrow" value={metrics.tomorrow} type="tomorrow" />
     </>
   );
 }
