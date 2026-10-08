@@ -1,3 +1,14 @@
+# README and production check for Checkpoint W30.4
+
+## Goal
+
+Checkpoint W30.4 is due Mon 12 Oct 08:00. For the 30 tier the reviewer opens your `README.md`, follows the production URL at the top, signs in with your demo login, and finds Create, Read, Update, Delete (CRUD) on two entities, two charts from real data, and Row Level Security (RLS) keeping a second user out of the first user's rows. This page condenses Thursday's README and production blocks into one checklist.
+
+## 1. The README skeleton
+
+Keep the headings; the reviewer looks for them by name. Fill in every angle-bracket line.
+
+```markdown
 # <Project name>
 
 Production: https://<your-production-domain>
@@ -6,9 +17,9 @@ Production: https://<your-production-domain>
 <Two sentences: who uses it, and what decision it helps them make.>
 
 ## Entities and the two questions the charts answer
-Entities: <customers>, <bookings (foreign key to customers)>
-1. <Is demand growing?>: <bar chart of new customers per month>. Who acts: <the owner>.
-2. <What share of bookings are missed?>: <donut of status this month>. Who acts: <the owner>.
+Entities: <patients>, <appointments (foreign key to patients)>
+1. <Is the practice growing?>: <bar chart of new patients per month>. Who acts: <the owner>.
+2. <What share of appointments are no-shows?>: <donut of status this month>. Who acts: <the owner>.
 
 ## Chart honesty checklist (both charts)
 - [ ] The title states the question the chart answers
@@ -53,14 +64,15 @@ A demo-only account with seed data; not a real person.
 ## Known gaps
 - <anything failing, one honest line each>
 - Example for a booking-shaped domain: "Two users can book the same slot; this app assumes one calendar owner."
+```
 
-The demo login is a dedicated demo user with a throwaway password, never your real password: the README is public, so anything in it is published. Enter the seed rows while signed in as the demo user, because RLS shows each user only their own rows. Before you submit, sign in as it yourself in a private window.
+The demo login is a dedicated demo user with a throwaway password, never your real password: the README is public, so anything in it is published. Enter the seed rows while signed in **as the demo user**, because RLS shows each user only their own rows. Before you submit, sign in as it yourself in a private window.
 
 ## 2. The production check
 
-1. Vercel → Project → Settings → Environment Variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY have Production ticked. Vercel: "Any change you make to environment variables are not applied to previous deployments, they only apply to new deployments." Change one, then Redeploy.
-2. Vercel → Deployments: the newest Production row, built from main, reads Ready.
-3. Copy the domain from Settings → Domains, open it in a private window, and check it matches the Production line of your README.
+1. Vercel → Project → Settings → Environment Variables: `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` have **Production** ticked. Vercel: "Any change you make to environment variables are not applied to previous deployments, they only apply to new deployments." Change one, then Redeploy.
+2. Vercel → Deployments: the newest **Production** row, built from main, reads **Ready**.
+3. Copy the domain from Settings → Domains, open it in a **private window**, and check it matches the Production line of your README.
 4. Sign in with the demo login exactly as the README spells it. Copy and paste; do not retype from memory.
 5. If you kept Realtime or Storage, run its check (R or S) on the production URL and run the three catalogue queries from Thursday's deploy block: the bucket is private, its policies exist, the table is in the publication. Delete your test files from the bucket.
 
@@ -78,11 +90,11 @@ git ls-files | grep env
 
 Only an example file of names may appear. Then open the repository on GitHub and confirm no .env.local is listed.
 
-Supabase's API keys page says the publishable key is "Safe to expose online", while a secret key: "Never put one in a browser, a shipped application, or source control." Next.js inlines every NEXT_PUBLIC_ value into the JavaScript sent to the browser, so a secret key must never sit in a NEXT_PUBLIC_ variable. If a secret key was committed, create a new one in Supabase (Settings → API Keys), replace it everywhere, then delete the old one.
+Supabase's API keys page says the publishable key is "Safe to expose online", while a secret key: "Never put one in a browser, a shipped application, or source control." Next.js inlines every `NEXT_PUBLIC_` value into the JavaScript sent to the browser, so a secret key must never sit in a `NEXT_PUBLIC_` variable. If a secret key was committed, create a new one in Supabase (Settings → API Keys), replace it everywhere, then delete the old one.
 
 ## 5. Get the blob link and submit
 
-On GitHub open README.md on main and copy the address bar. It has this shape:
+On GitHub open `README.md` on main and copy the address bar. It has this shape:
 
 ```text
 https://github.com/<you>/<repo>/blob/main/README.md
@@ -94,7 +106,7 @@ Submit that GitHub URL only, with the production URL at the top of the file.
 
 | Symptom | Fix |
 |---|---|
-| works locally, not in production | a variable missing for Production, or a type error: run pnpm build locally, fix, push, Redeploy |
+| works locally, not in production | a variable missing for Production, or a type error: run `pnpm build` locally, fix, push, Redeploy |
 | demo login fails | the user was created in a different Supabase project from the one production uses, or the email is unconfirmed |
 | charts empty in production | the seed rows belong to another user; sign in as the demo user and enter them again |
 
@@ -112,5 +124,3 @@ Submit that GitHub URL only, with the production URL at the top of the file.
 - Next.js environment variables: https://nextjs.org/docs/app/guides/environment-variables
 - GitHub, URLs to files: https://docs.github.com/en/repositories/working-with-files/using-files/getting-permanent-links-to-files
 - git ls-files: https://git-scm.com/docs/git-ls-files
-
-This repository intentionally reuses the dashboard starter as a template for a different site. The course README inside nextjs-dashboard/README.md is not the project README for this new site.

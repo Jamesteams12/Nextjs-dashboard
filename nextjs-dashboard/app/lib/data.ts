@@ -8,7 +8,10 @@ import {
   Revenue,
 } from './definitions';
 import { formatCurrency } from './utils';
-import { createClient, getCurrentSupabaseUserId } from '@/app/lib/supabase/server';
+import {
+  createClient,
+  getCurrentPatientOwnerId,
+} from '@/app/lib/supabase/server';
 
 const sql = postgres(process.env.POSTGRES_URL!, {
   ssl: 'require',
@@ -228,30 +231,40 @@ export type Patient = {
 
 export async function fetchPatients(): Promise<Patient[]> {
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
+  const patientOwnerId = await getCurrentPatientOwnerId();
+  const pageSize = 1000;
+  const patients: Patient[] = [];
 
-  const { data, error } = await supabase
-    .from('patients')
-    .select('id, user_id, full_name, phone, date_of_birth, created_at')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false });
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('patients')
+      .select('id, user_id, full_name, phone, date_of_birth, created_at')
+      .eq('user_id', patientOwnerId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
 
-  if (error) {
-    console.error('Supabase error:', error);
-    throw new Error('Failed to fetch patients.');
+    if (error) {
+      console.error('Supabase error:', error);
+      throw new Error('Failed to fetch patients.');
+    }
+
+    patients.push(...((data ?? []) as Patient[]));
+    if (!data || data.length < pageSize) break;
   }
-  return (data as Patient[]) ?? [];
+
+  return patients;
 }
 
 export async function fetchPatientById(id: string): Promise<Patient | null> {
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
+  const patientOwnerId = await getCurrentPatientOwnerId();
 
   const { data, error } = await supabase
     .from('patients')
     .select('id, user_id, full_name, phone, date_of_birth, created_at')
     .eq('id', id)
-    .eq('user_id', userId)
+    .eq('user_id', patientOwnerId)
     .maybeSingle();
 
   if (error) {
@@ -259,4 +272,255 @@ export async function fetchPatientById(id: string): Promise<Patient | null> {
     throw new Error('Failed to fetch patient.');
   }
   return (data as Patient | null) ?? null;
+}
+
+export type AppointmentStatus = 'booked' | 'done' | 'no_show';
+
+export type PatientOption = Pick<Patient, 'id' | 'full_name'>;
+
+export type Appointment = {
+  id: string;
+  user_id: string;
+  patient_id: string;
+  starts_at: string;
+  status: AppointmentStatus;
+  patient_name: string;
+  patient_phone: string | null;
+};
+
+export type AppointmentStatusCount = {
+  status: AppointmentStatus;
+  count: number;
+};
+
+export type ClinicMetrics = {
+  patients: number;
+  appointmentsThisWeek: number;
+  noShowRateThisMonth: number;
+  appointmentsTomorrow: number;
+};
+
+function clinicLocalDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  return {
+    year: Number(parts.find((part) => part.type === 'year')?.value),
+    month: Number(parts.find((part) => part.type === 'month')?.value),
+    day: Number(parts.find((part) => part.type === 'day')?.value),
+  };
+}
+
+function clinicLocalDateTimeToIso(year: number, month: number, day: number) {
+  return new Date(Date.UTC(year, month - 1, day) - 2 * 60 * 60 * 1000).toISOString();
+}
+
+export async function fetchClinicMetrics(): Promise<ClinicMetrics> {
+  const supabase = createClient();
+  const patientOwnerId = await getCurrentPatientOwnerId();
+  const { year, month, day } = clinicLocalDateParts(new Date());
+  const monday = new Date(Date.UTC(year, month - 1, day));
+  monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+  const weekStart = clinicLocalDateTimeToIso(
+    monday.getUTCFullYear(),
+    monday.getUTCMonth() + 1,
+    monday.getUTCDate(),
+  );
+  const nextWeek = new Date(monday);
+  nextWeek.setUTCDate(nextWeek.getUTCDate() + 7);
+  const weekEnd = clinicLocalDateTimeToIso(
+    nextWeek.getUTCFullYear(),
+    nextWeek.getUTCMonth() + 1,
+    nextWeek.getUTCDate(),
+  );
+  const tomorrowStart = clinicLocalDateTimeToIso(year, month, day + 1);
+  const dayAfterTomorrow = clinicLocalDateTimeToIso(year, month, day + 2);
+  const monthStart = clinicLocalDateTimeToIso(year, month, 1);
+  const nextMonthStart = clinicLocalDateTimeToIso(year, month + 1, 1);
+
+  const [patientResult, weekResult, tomorrowResult, monthResult] = await Promise.all([
+    supabase
+      .from('patients')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', patientOwnerId),
+    supabase
+      .from('appointments')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', patientOwnerId)
+      .gte('starts_at', weekStart)
+      .lt('starts_at', weekEnd),
+    supabase
+      .from('appointments')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', patientOwnerId)
+      .eq('status', 'booked')
+      .gte('starts_at', tomorrowStart)
+      .lt('starts_at', dayAfterTomorrow),
+    Promise.all(
+      (['booked', 'done', 'no_show'] as const).map((status) =>
+        supabase
+          .from('appointments')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', patientOwnerId)
+          .eq('status', status)
+          .gte('starts_at', monthStart)
+          .lt('starts_at', nextMonthStart),
+      ),
+    ),
+  ]);
+
+  const monthCounts = monthResult.map((result) => result.count ?? 0);
+  const failedQuery = [patientResult, weekResult, tomorrowResult, ...monthResult].find(
+    (result) => result.error,
+  );
+  if (failedQuery?.error) {
+    console.error('Supabase error fetching clinic dashboard metrics:', failedQuery.error);
+    throw new Error('Failed to fetch clinic dashboard metrics.');
+  }
+
+  const appointmentsThisMonth = monthCounts.reduce((sum, count) => sum + count, 0);
+  const noShowsThisMonth = monthCounts[2];
+
+  return {
+    patients: patientResult.count ?? 0,
+    appointmentsThisWeek: weekResult.count ?? 0,
+    noShowRateThisMonth:
+      appointmentsThisMonth === 0
+        ? 0
+        : Math.round((noShowsThisMonth / appointmentsThisMonth) * 100),
+    appointmentsTomorrow: tomorrowResult.count ?? 0,
+  };
+}
+
+export async function fetchPatientOptions(): Promise<PatientOption[]> {
+  const supabase = createClient();
+  const patientOwnerId = await getCurrentPatientOwnerId();
+  const pageSize = 1000;
+  const patients: PatientOption[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('patients')
+      .select('id, full_name')
+      .eq('user_id', patientOwnerId)
+      .order('full_name', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      throw new Error('Failed to fetch patients for appointment booking.');
+    }
+
+    patients.push(...((data ?? []) as PatientOption[]));
+    if (!data || data.length < pageSize) break;
+  }
+
+  return patients;
+}
+
+export async function fetchAppointments(): Promise<Appointment[]> {
+  const supabase = createClient();
+  const patientOwnerId = await getCurrentPatientOwnerId();
+  const pageSize = 1000;
+  const rows: Omit<Appointment, 'patient_name' | 'patient_phone'>[] = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('appointments')
+      .select('id, user_id, patient_id, starts_at, status')
+      .eq('user_id', patientOwnerId)
+      .order('starts_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error('Supabase error fetching appointments:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw new Error('Failed to fetch appointments.');
+    }
+
+    rows.push(
+      ...((data ?? []) as Omit<Appointment, 'patient_name' | 'patient_phone'>[]),
+    );
+    if (!data || data.length < pageSize) break;
+  }
+
+  if (rows.length === 0) return [];
+
+  const uniquePatientIds = [...new Set(rows.map((appointment) => appointment.patient_id))];
+  const patientPageSize = 500;
+  const patients: Pick<Patient, 'id' | 'full_name' | 'phone'>[] = [];
+
+  for (let from = 0; from < uniquePatientIds.length; from += patientPageSize) {
+    const patientIds = uniquePatientIds.slice(from, from + patientPageSize);
+    const { data, error } = await supabase
+      .from('patients')
+      .select('id, full_name, phone')
+      .eq('user_id', patientOwnerId)
+      .in('id', patientIds);
+
+    if (error) {
+      console.error('Supabase error:', error);
+      throw new Error('Failed to fetch appointment patients.');
+    }
+
+    patients.push(...((data ?? []) as Pick<Patient, 'id' | 'full_name' | 'phone'>[]));
+  }
+
+  const patientsById = new Map(
+    patients.map((patient) => [patient.id, patient]),
+  );
+
+  return rows.map((appointment) => {
+    const patient = patientsById.get(appointment.patient_id);
+    if (!patient) {
+      throw new Error(
+        `Appointment ${appointment.id} references a patient that is unavailable to this clinic.`,
+      );
+    }
+    return {
+      ...appointment,
+      patient_name: patient.full_name,
+      patient_phone: patient.phone,
+    };
+  });
+}
+
+export async function fetchAppointmentStatusCounts(): Promise<AppointmentStatusCount[]> {
+  const supabase = createClient();
+  const patientOwnerId = await getCurrentPatientOwnerId();
+  const { year, month } = clinicLocalDateParts(new Date());
+  const monthStart = clinicLocalDateTimeToIso(year, month, 1);
+  const nextMonthStart = clinicLocalDateTimeToIso(year, month + 1, 1);
+
+  const statuses: AppointmentStatus[] = ['booked', 'done', 'no_show'];
+  const results = await Promise.all(
+    statuses.map((status) =>
+      supabase
+        .from('appointments')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', patientOwnerId)
+        .eq('status', status)
+        .gte('starts_at', monthStart)
+        .lt('starts_at', nextMonthStart),
+    ),
+  );
+  const failedResult = results.find((result) => result.error);
+  if (failedResult?.error) {
+    console.error('Supabase error:', failedResult.error);
+    throw new Error('Failed to fetch appointment status counts.');
+  }
+
+  return statuses.map((status, index) => ({
+    status,
+    count: results[index].count ?? 0,
+  }));
 }
