@@ -1,6 +1,6 @@
 # <Project name>
 
-Production: https://<your-production-domain>
+Production: https://nextjs-dashboard-nine-theta-d8vctthkcs.vercel.app/
 
 ## What it is
 <Two sentences: who uses it, and what decision it helps them make.>
