@@ -9,15 +9,9 @@ export default function Page() {
       <div className="flex h-20 shrink-0 items-end rounded-lg bg-blue-600 p-4 md:h-52">
         <AcmeLogo />
       </div>
-<<<<<<< HEAD
       <div className="mt-4 flex grow flex-col gap-4 md:flex-row">
         <div className="flex flex-col justify-center gap-6 rounded-lg bg-gray-50 px-6 py-10 md:w-full md:px-20">
           <p className={`${lusitana.className} text-xl text-gray-800 md:text-3xl md:leading-normal`}>
-=======
-      <div className="mt-4 flex grow flex-col gap-4">
-        <div className="flex w-full flex-col justify-center gap-6 rounded-lg bg-gray-50 px-6 py-10 md:px-20">
-          <p className={`${lusitana.className} w-full text-xl text-gray-800 md:text-3xl md:leading-normal`}>
->>>>>>> 5f0a600cb0d29de299f94c20b94caf6af4a2a2d6
             <strong>Welcome to James Medical Clinic.</strong> This dashboard helps the owner track patient growth, monitor no-shows, and plan the next day of care.
           </p>
           <Link

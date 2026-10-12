@@ -1,6 +1,5 @@
-import { fetchAppointmentStatusCounts } from '@/app/lib/data';
-import { lusitana } from '@/app/ui/fonts';
 import { fetchAppointmentStatusSummary } from '@/app/lib/data';
+import { lusitana } from '@/app/ui/fonts';
 
 const statusStyles = [
   { key: 'booked', label: 'Booked', color: '#22c55e', dot: 'bg-emerald-500' },
