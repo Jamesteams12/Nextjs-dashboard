@@ -26,7 +26,11 @@ export const authConfig = {
     },
     authorized({ auth, request: { nextUrl } }) {
       const isLoggedIn = !!auth?.user;
-      const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
+      const isOnDashboard =
+        nextUrl.pathname === '/dashboard' ||
+        nextUrl.pathname.startsWith('/dashboard/');
+      const isLandingPage =
+        nextUrl.pathname === '/' || nextUrl.pathname === '/login';
       const isFrontDeskPath = frontDeskDashboardPaths.some((path) => {
         return nextUrl.pathname === path || nextUrl.pathname.startsWith(`${path}/`);
       });
@@ -48,7 +52,7 @@ export const authConfig = {
         return false;
       }
 
-      if (isLoggedIn) {
+      if (isLoggedIn && isLandingPage) {
         if (role === 'front_desk') {
           return Response.redirect(new URL('/dashboard/patients', nextUrl));
         }

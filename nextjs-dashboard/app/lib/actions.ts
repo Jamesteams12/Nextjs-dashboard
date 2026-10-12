@@ -30,6 +30,11 @@ const FormSchema = z.object({
 const CreateInvoice = FormSchema.omit({ id: true, date: true });
 const UpdateInvoice = FormSchema.omit({ id: true,date: true });
 
+const CustomerSchema = z.object({
+  name: z.string().trim().min(1, { message: 'Please enter the customer name.' }),
+  email: z.string().trim().email({ message: 'Please enter a valid email address.' }),
+});
+
 export type State = {
     errors?: {
         customerId?: string[];
@@ -39,7 +44,27 @@ export type State = {
     message?: string | null;
 };
 
+export type CustomerState = {
+  errors?: {
+    name?: string[];
+    email?: string[];
+  };
+  message?: string | null;
+};
+
+async function requireInvoiceEditor() {
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  if (!userId || session.user?.role !== 'owner') {
+    throw new Error('You must be signed in as an owner to manage invoices.');
+  }
+
+  return userId;
+}
+
 export async function createInvoice(prevState: State, formData: FormData) {
+    const userId = await requireInvoiceEditor();
     const validatedFields = CreateInvoice.safeParse({
         customerId: formData.get('customerId'),
         amount: formData.get('amount'),
@@ -54,23 +79,34 @@ export async function createInvoice(prevState: State, formData: FormData) {
     }
 
     const { customerId, amount, status } = validatedFields.data;
+    const customer = await sql`
+        SELECT id FROM customers
+        WHERE id = ${customerId} AND user_id = ${userId}
+        LIMIT 1
+    `;
+    if (customer.length === 0) {
+        return {
+            errors: { customerId: ['Please select one of your customers.'] },
+            message: 'Failed to create invoice.',
+        };
+    }
     const amountInCents = amount * 100;
     const date = new Date().toISOString().split('T')[0];
 
-    try{
+    try {
         await sql`
-        INSERT INTO invoices (customer_id, amount, status, date)
-        VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
-    `;
+        INSERT INTO invoices (customer_id, user_id, amount, status, date)
+        VALUES (${customerId}, ${userId}, ${amountInCents}, ${status}, ${date})
+        `;
     } catch (error) {
-        console.error(error);
+        console.error('Database error:', error);
         return {
             message: 'Database Error: Failed to Create Invoice',
         };
     }
-    
 
     revalidatePath('/dashboard/invoices');
+    revalidatePath('/dashboard');
     redirect('/dashboard/invoices');
 }
 
@@ -79,6 +115,7 @@ export async function updateInvoice(
     prevState: State,
     formData: FormData,
 ) {
+    const userId = await requireInvoiceEditor();
     const validatedFields = UpdateInvoice.safeParse({
         customerId: formData.get('customerId'),
         amount: formData.get('amount'),
@@ -93,28 +130,78 @@ export async function updateInvoice(
 }
 
     const { customerId, amount, status } = validatedFields.data;
+    const customer = await sql`
+        SELECT id FROM customers
+        WHERE id = ${customerId} AND user_id = ${userId}
+        LIMIT 1
+    `;
+    if (customer.length === 0) {
+        return {
+            errors: { customerId: ['Please select one of your customers.'] },
+            message: 'Failed to update invoice.',
+        };
+    }
     const amountInCents = amount * 100;
 
     try {
-        await sql`
+        const updated = await sql`
             UPDATE invoices
             SET customer_id = ${customerId}, amount = ${amountInCents}, status = ${status}
-            WHERE id = ${id}
+            WHERE id = ${id} AND user_id = ${userId}
+            RETURNING id
         `;
-} catch (error) {
-    return { message: 'Database Error: Failed to Update Invoice.' };
-}
+        if (updated.length === 0) {
+            return { message: 'Invoice not found or access denied.' };
+        }
+    } catch (error) {
+        console.error('Database error:', error);
+        return { message: 'Database Error: Failed to Update Invoice.' };
+    }
 
     revalidatePath('/dashboard/invoices');
     redirect('/dashboard/invoices');
 }
 
 export async function deleteInvoice(id: string) {
+    const userId = await requireInvoiceEditor();
     await sql`
         DELETE FROM invoices
-        WHERE id = ${id}
+        WHERE id = ${id} AND user_id = ${userId}
     `;
     revalidatePath('/dashboard/invoices');
+    revalidatePath('/dashboard');
+}
+
+export async function createCustomer(
+  prevState: CustomerState,
+  formData: FormData,
+) {
+  const userId = await requireInvoiceEditor();
+  const validated = CustomerSchema.safeParse({
+    name: formData.get('name'),
+    email: formData.get('email'),
+  });
+
+  if (!validated.success) {
+    return {
+      errors: validated.error.flatten().fieldErrors,
+      message: 'Missing or invalid fields. Failed to create customer.',
+    };
+  }
+
+  try {
+    await sql`
+      INSERT INTO customers (user_id, name, email, image_url)
+      VALUES (${userId}, ${validated.data.name}, ${validated.data.email}, '/customers/default-avatar.svg')
+    `;
+  } catch (error) {
+    console.error('Database error:', error);
+    return { message: 'Database Error: Failed to Create Customer.' };
+  }
+
+  revalidatePath('/dashboard/customers');
+  revalidatePath('/dashboard/invoices/create');
+  redirect('/dashboard/customers');
 }
 
 export async function authenticate(

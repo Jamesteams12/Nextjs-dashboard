@@ -19,10 +19,10 @@ export default async function CardWrapper() {
 
   return (
     <>
-      <Card title="Patients" value={metrics.patients} type="patients" />
-      <Card title="Appointments this week" value={metrics.appointmentsThisWeek} type="appointments" />
-      <Card title="No-show rate this month" value={`${metrics.noShowRateThisMonth}%`} type="noShows" />
-      <Card title="Booked for tomorrow" value={metrics.appointmentsTomorrow} type="tomorrow" />
+      <Card title="New patients this month" value={metrics.newPatients} type="patients" />
+      <Card title="Booked this week" value={metrics.bookedThisWeek} type="appointments" />
+      <Card title="No-shows this month" value={metrics.noShowsThisMonth} type="noShows" />
+      <Card title="Appointments tomorrow" value={metrics.tomorrow} type="tomorrow" />
     </>
   );
 }
