@@ -39,11 +39,14 @@ async function seedUsers() {
 
 async function seedInvoices() {
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+  const ownerUserId = users.find((user) => user.role === 'owner')?.id;
+  if (!ownerUserId) throw new Error('No owner account is available for seeding.');
 
   await sql`
     CREATE TABLE IF NOT EXISTS invoices (
       id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
       customer_id UUID NOT NULL,
+      user_id UUID NOT NULL REFERENCES users(id),
       amount INT NOT NULL,
       status VARCHAR(255) NOT NULL,
       date DATE NOT NULL
@@ -53,8 +56,8 @@ async function seedInvoices() {
   const insertedInvoices = await Promise.all(
     invoices.map(
       (invoice) => sql`
-        INSERT INTO invoices (customer_id, amount, status, date)
-        VALUES (${invoice.customer_id}, ${invoice.amount}, ${invoice.status}, ${invoice.date})
+        INSERT INTO invoices (customer_id, user_id, amount, status, date)
+        VALUES (${invoice.customer_id}, ${ownerUserId}, ${invoice.amount}, ${invoice.status}, ${invoice.date})
         ON CONFLICT (id) DO NOTHING;
       `,
     ),
@@ -65,10 +68,13 @@ async function seedInvoices() {
 
 async function seedCustomers() {
   await sql`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`;
+  const ownerUserId = users.find((user) => user.role === 'owner')?.id;
+  if (!ownerUserId) throw new Error('No owner account is available for seeding.');
 
   await sql`
     CREATE TABLE IF NOT EXISTS customers (
       id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+      user_id UUID NOT NULL REFERENCES users(id),
       name VARCHAR(255) NOT NULL,
       email VARCHAR(255) NOT NULL,
       image_url VARCHAR(255) NOT NULL
@@ -78,8 +84,8 @@ async function seedCustomers() {
   const insertedCustomers = await Promise.all(
     customers.map(
       (customer) => sql`
-        INSERT INTO customers (id, name, email, image_url)
-        VALUES (${customer.id}, ${customer.name}, ${customer.email}, ${customer.image_url})
+        INSERT INTO customers (id, user_id, name, email, image_url)
+        VALUES (${customer.id}, ${ownerUserId}, ${customer.name}, ${customer.email}, ${customer.image_url})
         ON CONFLICT (id) DO NOTHING;
       `,
     ),
@@ -109,7 +115,11 @@ async function seedRevenue() {
   return insertedRevenue;
 }
 
-export async function GET() {
+export async function POST() {
+  if (process.env.NODE_ENV !== 'development') {
+    return Response.json({ error: 'Not found.' }, { status: 404 });
+  }
+
   try {
     await seedUsers();
     await seedCustomers();
