@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { fetchAppointments } from '@/app/lib/data';
 import { lusitana } from '@/app/ui/fonts';
 import { fetchAppointments } from '@/app/lib/data';
 

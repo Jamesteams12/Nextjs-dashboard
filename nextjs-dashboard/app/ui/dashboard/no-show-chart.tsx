@@ -1,3 +1,4 @@
+import { fetchAppointmentStatusCounts } from '@/app/lib/data';
 import { lusitana } from '@/app/ui/fonts';
 import { fetchAppointmentStatusSummary } from '@/app/lib/data';
 

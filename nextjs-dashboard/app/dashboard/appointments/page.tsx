@@ -1,3 +1,6 @@
+import { fetchAppointments, fetchPatientOptions } from '@/app/lib/data';
+import AppointmentRow from '@/app/ui/appointments/appointment-row';
+import CreateAppointmentForm from '@/app/ui/appointments/create-form';
 import { lusitana } from '@/app/ui/fonts';
 import { fetchAppointments } from '@/app/lib/data';
 
@@ -14,6 +17,7 @@ export default async function Page() {
   return (
     <div className="w-full">
       <h1 className={`${lusitana.className} mb-4 text-2xl`}>Appointments</h1>
+      <CreateAppointmentForm patients={patients} />
 
       {appointments.length === 0 ? (
         <p className="rounded-xl bg-white p-4 text-sm text-gray-500 shadow-sm ring-1 ring-gray-200">
