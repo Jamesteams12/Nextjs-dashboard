@@ -1,25 +1,19 @@
-# <Project name>
+# James Medical Patient tracker
 
 Production: https://nextjs-dashboard-nine-theta-d8vctthkcs.vercel.app/
 
 ## What it is
-<Two sentences: who uses it, and what decision it helps them make.>
+This program is used for medical staff to keep track of appointments. This can also help keep patient information organized and help keep track of their status of if they are coming or not
 
-## Entities and the two questions the charts answer
-Entities: <customers>, <bookings (foreign key to customers)>
-1. <Is demand growing?>: <bar chart of new customers per month>. Who acts: <the owner>.
-2. <What share of bookings are missed?>: <donut of status this month>. Who acts: <the owner>.
+## DEMO LOGINS (for reviewers)
+Email: owner@nextmail.com
+Password: 123456
 
-## Chart honesty checklist (both charts)
-- [ ] The title states the question the chart answers
-- [ ] Both axes are labelled, with units (the donut: a labelled legend)
-- [ ] With no rows for the signed-in user, a sentence shows instead of an empty chart
-- [ ] One "so what" line under the chart names who acts and on what
+Email:frontdesk@nextmail.com
+Password:frontdesk123
 
-## DEMO LOGIN (for reviewers)
-Email: demo@<your-project>.example
-Password: <a throwaway password used nowhere else>
-A demo-only account with seed data; not a real person.
+Email:frontdesk2@nextmail.com
+Password:frontdesk456
 
 ## How to run locally
 1. Clone the repository and run pnpm install.
@@ -43,16 +37,11 @@ A demo-only account with seed data; not a real person.
 - [ ] R. (only if shipped) Realtime: an insert in window A updates window B within a second
 - [ ] S. (only if shipped) Storage: upload and signed link work; user two cannot open user one's file; the bucket is private
 
-## Freeze plan (8 Oct)
-### Cut (one honest sentence each)
-- <Third entity>: <why it is not shipping>
-
-## Stretch (delete this section if you cut it)
-<Realtime or Storage: what it does and which table or bucket. Bucket: <name>, private, size limit <size>. Smoke check R or S ticked above.>
+## Freeze plan
+- A Today section: shows the appointments on the current day, only can see which it is today on the appointment section
 
 ## Known gaps
-- <anything failing, one honest line each>
-- Example for a booking-shaped domain: "Two users can book the same slot; this app assumes one calendar owner."
+- Two Appointments can be blocked at the same time on the same day
 
 The demo login is a dedicated demo user with a throwaway password, never your real password: the README is public, so anything in it is published. Enter the seed rows while signed in as the demo user, because RLS shows each user only their own rows. Before you submit, sign in as it yourself in a private window.
 
