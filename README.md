@@ -5,7 +5,7 @@ Production: https://nextjs-dashboard-nine-theta-d8vctthkcs.vercel.app/
 ## What it is
 This program is used for medical staff to keep track of appointments. This can also help keep patient information organized and help keep track of their status of if they are coming or not. useful when the user has many clinics to manage with different patients and schedule and the owner can see them all but the front desk gets to only see what is needed for them and their own patient and not another clinics patients.
 
-## DEMO LOGINS (for reviewers)
+## DEMO LOGINS (for reviewers only)
 Email: owner@nextmail.com
 Password: 123456
 
@@ -34,12 +34,24 @@ Password:frontdesk456
 - [x] 8. Empty create form shows messages, saves nothing
 - [x] 9. Unknown URL shows the not-found page
 - [x] 10. Sign out works; .env.local is not on GitHub
-- [ ] R. (only if shipped) Realtime: an insert in window A updates window B within a second
-- [ ] S. (only if shipped) Storage: upload and signed link work; user two cannot open user one's file; the bucket is private
 
 ## Freeze plan
-- A Today section: shows the appointments on the current day, only can see which it is today on the appointment section
-- treatment section: Did not finish it to add to the website
+ 
+### Must ship today
+1. Fix: patients create, edit and delete work in production behind RLS.
+2. Fix: appointments create, edit and delete work in production; the patient select lists only my patients.
+3. Verify: both charts render from real rows with the question as title and labelled axes or legend.
+4. Verify: user two sees none of user one's rows, and user one's edit URL gives the not-found page.
+5. Ship: a "Today" section on the appointments page listing only today's appointments.
+### Cut
+- Treatments entity: cut because patients and appointments needed to be fully working behind RLS first, and a half-built third entity is worse than none.
+- Stretch (Realtime/Storage): cut so that nothing new starts on freeze day.
+- Preventing double-booked slots: cut because it needs a database constraint and a clear user message, which was out of scope for this week.
+### Monday polish
+1. Complete and date the smoke test in this README.
+2. Tidy the wording of empty states on both lists.
+3. Add a "so what" line under each chart if any is missing.
 
 ## Known gaps
-- Two Appointments can be blocked at the same time on the same day
+- Two Appointments can be blocked at the same time on the same day.
+- Treatments entity and the Realtime/Storage stretch were not built.
