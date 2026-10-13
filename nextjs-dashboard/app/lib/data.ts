@@ -10,10 +10,16 @@ import {
 import { formatCurrency } from './utils';
 import {
   createClient,
-  getCurrentPatientOwnerId,
+  getCurrentPatientAccess,
 } from '@/app/lib/supabase/server';
 
-const getCurrentSupabaseUserId = getCurrentPatientOwnerId;
+async function getCurrentOwnerId() {
+  const access = await getCurrentPatientAccess();
+  if (access.role !== 'owner') {
+    throw new Error('Only the clinic owner can access financial records.');
+  }
+  return access.userId;
+}
 
 const sql = postgres(process.env.POSTGRES_URL!, {
   ssl: 'require',
@@ -35,7 +41,7 @@ export async function fetchRevenue() {
 }
 
 export async function fetchLatestInvoices() {
-  const userId = await getCurrentSupabaseUserId();
+  const userId = await getCurrentOwnerId();
   try {
     const data = await sql<LatestInvoiceRaw[]>`
       SELECT invoices.amount, customers.name, customers.image_url, customers.email, invoices.id
@@ -57,7 +63,7 @@ export async function fetchLatestInvoices() {
 }
 
 export async function fetchCardData() {
-  const userId = await getCurrentSupabaseUserId();
+  const userId = await getCurrentOwnerId();
   try {
     // You can probably combine these into a single SQL query
     // However, we are intentionally splitting them to demonstrate
@@ -97,7 +103,7 @@ export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
 ) {
-  const userId = await getCurrentSupabaseUserId();
+  const userId = await getCurrentOwnerId();
   const offset = (Math.max(1, currentPage) - 1) * ITEMS_PER_PAGE;
 
   try {
@@ -130,7 +136,7 @@ export async function fetchFilteredInvoices(
 }
 
 export async function fetchInvoicesPages(query: string) {
-  const userId = await getCurrentSupabaseUserId();
+  const userId = await getCurrentOwnerId();
   try {
     const data = await sql`SELECT COUNT(*)
     FROM invoices
@@ -152,7 +158,7 @@ export async function fetchInvoicesPages(query: string) {
 }
 
 export async function fetchInvoiceById(id: string) {
-  const userId = await getCurrentSupabaseUserId();
+  const userId = await getCurrentOwnerId();
   try {
     const data = await sql<InvoiceForm[]>`
       SELECT
@@ -178,7 +184,7 @@ export async function fetchInvoiceById(id: string) {
 }
 
 export async function fetchCustomers() {
-  const userId = await getCurrentSupabaseUserId();
+  const userId = await getCurrentOwnerId();
   try {
     const customers = await sql<CustomerField[]>`
       SELECT
@@ -198,7 +204,7 @@ export async function fetchCustomers() {
 }
 
 export async function fetchFilteredCustomers(query: string) {
-  const userId = await getCurrentSupabaseUserId();
+  const userId = await getCurrentOwnerId();
   try {
     const data = await sql<CustomersTableType[]>`
 		SELECT
@@ -287,15 +293,18 @@ function normalizeAppointmentStatus(status: string) {
 
 export async function fetchPatientGrowth(): Promise<PatientGrowth[]> {
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
+  const access = await getCurrentPatientAccess();
   const firstMonth = getUtcMonthStart(-5);
   const nextMonth = getUtcMonthStart(1);
-  const { data, error } = await supabase
+  let query = supabase
     .from('patients')
     .select('created_at')
-    .eq('user_id', userId)
     .gte('created_at', firstMonth.toISOString())
     .lt('created_at', nextMonth.toISOString());
+  if (access.role === 'front_desk') {
+    query = query.eq('user_id', access.userId);
+  }
+  const { data, error } = await query;
 
   if (error) {
     console.error('Supabase error:', error);
@@ -323,15 +332,18 @@ export async function fetchPatientGrowth(): Promise<PatientGrowth[]> {
 
 export async function fetchAppointmentStatusSummary(): Promise<AppointmentStatusSummary> {
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
+  const access = await getCurrentPatientAccess();
   const monthStart = getUtcMonthStart();
   const nextMonth = getUtcMonthStart(1);
-  const { data, error } = await supabase
+  let query = supabase
     .from('appointments')
     .select('status')
-    .eq('user_id', userId)
     .gte('starts_at', monthStart.toISOString())
     .lt('starts_at', nextMonth.toISOString());
+  if (access.role === 'front_desk') {
+    query = query.eq('user_id', access.userId);
+  }
+  const { data, error } = await query;
 
   if (error) {
     console.error('Supabase error:', error);
@@ -356,14 +368,17 @@ export async function fetchAppointments(
   end: Date,
 ): Promise<Appointment[]> {
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
-  const { data, error } = await supabase
+  const access = await getCurrentPatientAccess();
+  let query = supabase
     .from('appointments')
     .select('id, patient_id, starts_at, status')
-    .eq('user_id', userId)
     .gte('starts_at', start.toISOString())
     .lt('starts_at', end.toISOString())
     .order('starts_at', { ascending: true });
+  if (access.role === 'front_desk') {
+    query = query.eq('user_id', access.userId);
+  }
+  const { data, error } = await query;
 
   if (error) {
     console.error('Supabase error:', error);
@@ -378,11 +393,14 @@ export async function fetchAppointments(
   >();
 
   if (patientIds.length > 0) {
-    const { data: patients, error: patientError } = await supabase
+    let patientQuery = supabase
       .from('patients')
       .select('id, full_name, phone')
-      .eq('user_id', userId)
       .in('id', patientIds);
+    if (access.role === 'front_desk') {
+      patientQuery = patientQuery.eq('user_id', access.userId);
+    }
+    const { data: patients, error: patientError } = await patientQuery;
 
     if (patientError) {
       console.error('Supabase error:', patientError);
@@ -403,40 +421,46 @@ export async function fetchAppointments(
 
 export async function fetchClinicMetrics(): Promise<ClinicMetrics> {
   const supabase = createClient();
-  const userId = await getCurrentSupabaseUserId();
+  const access = await getCurrentPatientAccess();
   const monthStart = getUtcMonthStart();
   const nextMonthStart = getUtcMonthStart(1);
   const weekStart = getUtcDayStart(-((new Date().getUTCDay() + 6) % 7));
   const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
   const tomorrowStart = getUtcDayStart(1);
   const dayAfterTomorrow = getUtcDayStart(2);
+  let patientsQuery = supabase
+    .from('patients')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', monthStart.toISOString())
+    .lt('created_at', nextMonthStart.toISOString());
+  let weekQuery = supabase
+    .from('appointments')
+    .select('id', { count: 'exact', head: true })
+    .in('status', ['booked', 'scheduled'])
+    .gte('starts_at', weekStart.toISOString())
+    .lt('starts_at', weekEnd.toISOString());
+  let tomorrowQuery = supabase
+    .from('appointments')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'booked')
+    .gte('starts_at', tomorrowStart.toISOString())
+    .lt('starts_at', dayAfterTomorrow.toISOString());
+  let monthQuery = supabase
+    .from('appointments')
+    .select('status')
+    .gte('starts_at', monthStart.toISOString())
+    .lt('starts_at', nextMonthStart.toISOString());
+  if (access.role === 'front_desk') {
+    patientsQuery = patientsQuery.eq('user_id', access.userId);
+    weekQuery = weekQuery.eq('user_id', access.userId);
+    tomorrowQuery = tomorrowQuery.eq('user_id', access.userId);
+    monthQuery = monthQuery.eq('user_id', access.userId);
+  }
   const [patientsResult, weekResult, tomorrowResult, monthResult] = await Promise.all([
-    supabase
-      .from('patients')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .gte('created_at', monthStart.toISOString())
-      .lt('created_at', nextMonthStart.toISOString()),
-    supabase
-      .from('appointments')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .in('status', ['booked', 'scheduled'])
-      .gte('starts_at', weekStart.toISOString())
-      .lt('starts_at', weekEnd.toISOString()),
-    supabase
-      .from('appointments')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('status', 'booked')
-      .gte('starts_at', tomorrowStart.toISOString())
-      .lt('starts_at', dayAfterTomorrow.toISOString()),
-    supabase
-      .from('appointments')
-      .select('status')
-      .eq('user_id', userId)
-      .gte('starts_at', monthStart.toISOString())
-      .lt('starts_at', nextMonthStart.toISOString()),
+    patientsQuery,
+    weekQuery,
+    tomorrowQuery,
+    monthQuery,
   ]);
 
   if (patientsResult.error) {
@@ -466,18 +490,21 @@ export async function fetchClinicMetrics(): Promise<ClinicMetrics> {
 
 export async function fetchPatients(): Promise<Patient[]> {
   const supabase = createClient();
-  const patientOwnerId = await getCurrentPatientOwnerId();
+  const access = await getCurrentPatientAccess();
   const pageSize = 1000;
   const patients: Patient[] = [];
 
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('patients')
       .select('id, user_id, full_name, phone, date_of_birth, created_at')
-      .eq('user_id', patientOwnerId)
       .order('created_at', { ascending: false })
       .order('id', { ascending: true })
       .range(from, from + pageSize - 1);
+    if (access.role === 'front_desk') {
+      query = query.eq('user_id', access.userId);
+    }
+    const { data, error } = await query;
 
     if (error) {
       console.error('Supabase error:', error);
@@ -493,14 +520,16 @@ export async function fetchPatients(): Promise<Patient[]> {
 
 export async function fetchPatientById(id: string): Promise<Patient | null> {
   const supabase = createClient();
-  const patientOwnerId = await getCurrentPatientOwnerId();
+  const access = await getCurrentPatientAccess();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('patients')
     .select('id, user_id, full_name, phone, date_of_birth, created_at')
-    .eq('id', id)
-    .eq('user_id', patientOwnerId)
-    .maybeSingle();
+    .eq('id', id);
+  if (access.role === 'front_desk') {
+    query = query.eq('user_id', access.userId);
+  }
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     console.error('Supabase error:', error);
@@ -511,18 +540,21 @@ export async function fetchPatientById(id: string): Promise<Patient | null> {
 
 export async function fetchPatientOptions(): Promise<PatientOption[]> {
   const supabase = createClient();
-  const patientOwnerId = await getCurrentPatientOwnerId();
+  const access = await getCurrentPatientAccess();
   const pageSize = 1000;
   const patients: PatientOption[] = [];
 
   for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('patients')
       .select('id, full_name')
-      .eq('user_id', patientOwnerId)
       .order('full_name', { ascending: true })
       .order('id', { ascending: true })
       .range(from, from + pageSize - 1);
+    if (access.role === 'front_desk') {
+      query = query.eq('user_id', access.userId);
+    }
+    const { data, error } = await query;
 
     if (error) {
       console.error('Supabase error:', error);

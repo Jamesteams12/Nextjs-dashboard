@@ -15,6 +15,13 @@ const users = [
     password: 'frontdesk123',
     role: 'front_desk',
   },
+  {
+    id: 'aa6ff0e4-5a6d-47f8-9c1a-7c8ddc1e9a23',
+    name: 'Front Desk 2',
+    email: 'frontdesk2@nextmail.com',
+    password: 'frontdesk456',
+    role: 'front_desk',
+  },
 ];
 
 const customers = [

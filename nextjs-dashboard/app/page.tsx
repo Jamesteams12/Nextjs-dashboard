@@ -12,7 +12,7 @@ export default function Page() {
       <div className="mt-4 flex grow flex-col gap-4 md:flex-row">
         <div className="flex flex-col justify-center gap-6 rounded-lg bg-gray-50 px-6 py-10 md:w-full md:px-20">
           <p className={`${lusitana.className} text-xl text-gray-800 md:text-3xl md:leading-normal`}>
-            <strong>Welcome to James Medical Clinic.</strong> This dashboard helps the owner track patient growth, monitor no-shows, and plan the next day of care.
+            <strong>Welcome to James Medical Patient tracker.</strong> This dashboard helps the owner track patient growth, monitor no-shows, and plan the next day of care.
           </p>
           <Link
             href="/login"

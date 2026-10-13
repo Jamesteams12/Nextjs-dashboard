@@ -6,7 +6,7 @@ import { redirect } from 'next/navigation';
 import postgres from 'postgres';
 import { AuthError } from 'next-auth';
 import { auth, signIn } from '@/auth';
-import { createClient, getPatientOwnerId } from '@/app/lib/supabase/server';
+import { createClient } from '@/app/lib/supabase/server';
 
 const sql = postgres(process.env.POSTGRES_URL!, {
   ssl: 'require',
@@ -292,21 +292,25 @@ async function requirePatientEditor() {
   return { role, userId };
 }
 
-async function requireClinicPatient(patientId: string, patientOwnerId: string) {
+async function requireClinicPatient(
+  patientId: string,
+  role: 'owner' | 'front_desk',
+  userId: string,
+) {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('patients')
-    .select('id')
-    .eq('id', patientId)
-    .eq('user_id', patientOwnerId)
-    .maybeSingle();
+    .select('user_id')
+    .eq('id', patientId);
+  if (role === 'front_desk') query = query.eq('user_id', userId);
+  const { data, error } = await query.maybeSingle();
 
   if (error) {
     console.error('Supabase error checking appointment patient:', error);
     throw new Error(`Database error ${error.code}: failed to verify patient.`);
   }
 
-  return data !== null;
+  return data?.user_id ?? null;
 }
 
 function appointmentTimestamp(dateTimeLocal: string) {
@@ -318,7 +322,6 @@ export async function createAppointment(
   formData: FormData,
 ): Promise<AppointmentState> {
   const { role, userId } = await requirePatientEditor();
-  const patientOwnerId = await getPatientOwnerId(role, userId);
   const validated = AppointmentSchema.safeParse({
     patient_id: formData.get('patient_id'),
     starts_at: formData.get('starts_at'),
@@ -332,7 +335,12 @@ export async function createAppointment(
     };
   }
 
-  if (!(await requireClinicPatient(validated.data.patient_id, patientOwnerId))) {
+  const patientOwnerId = await requireClinicPatient(
+    validated.data.patient_id,
+    role,
+    userId,
+  );
+  if (!patientOwnerId) {
     return {
       errors: { patient_id: ['Select a patient from this clinic.'] },
       message: 'Failed to create appointment.',
@@ -364,7 +372,6 @@ export async function updateAppointment(
   formData: FormData,
 ): Promise<AppointmentState> {
   const { role, userId } = await requirePatientEditor();
-  const patientOwnerId = await getPatientOwnerId(role, userId);
   const validated = AppointmentSchema.safeParse({
     patient_id: formData.get('patient_id'),
     starts_at: formData.get('starts_at'),
@@ -378,7 +385,12 @@ export async function updateAppointment(
     };
   }
 
-  if (!(await requireClinicPatient(validated.data.patient_id, patientOwnerId))) {
+  const patientOwnerId = await requireClinicPatient(
+    validated.data.patient_id,
+    role,
+    userId,
+  );
+  if (!patientOwnerId) {
     return {
       errors: { patient_id: ['Select a patient from this clinic.'] },
       message: 'Failed to update appointment.',
@@ -386,17 +398,17 @@ export async function updateAppointment(
   }
 
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('appointments')
     .update({
+      user_id: patientOwnerId,
       patient_id: validated.data.patient_id,
       starts_at: appointmentTimestamp(validated.data.starts_at),
       status: validated.data.status,
     })
-    .eq('id', id)
-    .eq('user_id', patientOwnerId)
-    .select('id')
-    .maybeSingle();
+    .eq('id', id);
+  if (role === 'front_desk') query = query.eq('user_id', userId);
+  const { data, error } = await query.select('id').maybeSingle();
 
   if (error) {
     console.error('Supabase error:', error);
@@ -414,15 +426,13 @@ export async function updateAppointment(
 
 export async function deleteAppointment(id: string) {
   const { role, userId } = await requirePatientEditor();
-  const patientOwnerId = await getPatientOwnerId(role, userId);
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from('appointments')
     .delete()
-    .eq('id', id)
-    .eq('user_id', patientOwnerId)
-    .select('id')
-    .maybeSingle();
+    .eq('id', id);
+  if (role === 'front_desk') query = query.eq('user_id', userId);
+  const { data, error } = await query.select('id').maybeSingle();
 
   if (error) {
     console.error('Supabase error:', error);
@@ -438,8 +448,7 @@ export async function deleteAppointment(id: string) {
 }
 
 export async function createPatient(prevState: PatientState, formData: FormData) {
-  const { role, userId } = await requirePatientEditor();
-  const patientOwnerId = await getPatientOwnerId(role, userId);
+  const { userId } = await requirePatientEditor();
   const validated = PatientSchema.safeParse({
     full_name: formData.get('full_name'),
     phone: formData.get('phone'),
@@ -455,7 +464,7 @@ export async function createPatient(prevState: PatientState, formData: FormData)
   const supabase = createClient();
 
   const { error } = await supabase.from('patients').insert({
-    user_id: patientOwnerId,
+    user_id: userId,
     full_name,
     phone: phone || null,
     date_of_birth: date_of_birth || null,
@@ -476,7 +485,6 @@ export async function updatePatient(
   formData: FormData,
 ) {
   const { role, userId } = await requirePatientEditor();
-  const patientOwnerId = await getPatientOwnerId(role, userId);
   const validated = PatientSchema.safeParse({
     full_name: formData.get('full_name'),
     phone: formData.get('phone'),
@@ -491,16 +499,16 @@ export async function updatePatient(
   const { full_name, phone, date_of_birth } = validated.data;
   const supabase = createClient();
 
-  const { error } = await supabase
+  let query = supabase
     .from('patients')
     .update({
       full_name,
       phone: phone || null,
       date_of_birth: date_of_birth || null,
-      user_id: patientOwnerId,
     })
-    .eq('id', id)
-    .eq('user_id', patientOwnerId);
+    .eq('id', id);
+  if (role === 'front_desk') query = query.eq('user_id', userId);
+  const { error } = await query;
 
   if (error) {
     console.error('Supabase error:', error);
@@ -512,19 +520,16 @@ export async function updatePatient(
 }
 
 export async function deletePatient(id: string) {
-  const { role, userId } = await requirePatientEditor();
+  const { role } = await requirePatientEditor();
   if (role !== 'owner') {
     throw new Error('Only the clinic owner can delete patients.');
   }
-  const patientOwnerId = await getPatientOwnerId(role, userId);
-
   const supabase = createClient();
 
   const { error } = await supabase
     .from('patients')
     .delete()
-    .eq('id', id)
-    .eq('user_id', patientOwnerId);
+    .eq('id', id);
 
   if (error) {
     console.error('Supabase error:', error);

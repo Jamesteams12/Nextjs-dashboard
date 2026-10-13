@@ -1,6 +1,5 @@
 import 'server-only';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import postgres from 'postgres';
 import { auth } from '@/auth';
 import type { UserRole } from '@/app/lib/definitions';
 
@@ -24,47 +23,25 @@ export function createClient() {
   });
 }
 
-export async function getPatientOwnerId(
+export type PatientAccess = {
+  role: UserRole;
+  userId: string;
+};
+
+export function getPatientAccess(
   role: UserRole | undefined,
   userId: string | undefined,
-) {
+): PatientAccess {
   if (!userId || (role !== 'owner' && role !== 'front_desk')) {
     throw new Error('You must be signed in with a clinic staff account.');
   }
 
-  if (role === 'owner') {
-    return userId;
-  }
-
-  const databaseUrl = process.env.POSTGRES_URL;
-  if (!databaseUrl) {
-    throw new Error('Missing POSTGRES_URL while resolving clinic ownership.');
-  }
-
-  const sql = postgres(databaseUrl, { ssl: 'require', prepare: false });
-  try {
-    const owners = await sql<{ id: string }[]>`
-      SELECT id FROM users WHERE role = 'owner' LIMIT 2
-    `;
-
-    if (owners.length !== 1) {
-      throw new Error(
-        `Expected exactly one clinic owner, found ${owners.length > 1 ? 'multiple' : 'none'}.`,
-      );
-    }
-
-    return owners[0].id;
-  } catch (error) {
-    console.error('Failed to resolve clinic owner for patient access:', error);
-    throw new Error('Failed to resolve clinic owner for patient access.');
-  } finally {
-    await sql.end();
-  }
+  return { role, userId };
 }
 
-export async function getCurrentPatientOwnerId() {
+export async function getCurrentPatientAccess() {
   const session = await auth();
-  return getPatientOwnerId(
+  return getPatientAccess(
     session?.user?.role,
     typeof session?.user?.id === 'string' ? session.user.id : undefined,
   );

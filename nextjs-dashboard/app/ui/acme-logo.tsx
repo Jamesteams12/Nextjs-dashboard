@@ -7,7 +7,7 @@ export default function AcmeLogo() {
       className={`${lusitana.className} flex flex-row items-center gap-3 leading-none text-white`}
     >
       <HeartIcon className="h-8 w-8 text-rose-200" />
-      <p className="text-[30px] md:text-[44px]">James Medical Clinic</p>
+      <p className="text-[30px] md:text-[44px]">James Medical Patient tracker</p>
     </div>
   );
 }
