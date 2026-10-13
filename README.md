@@ -3,7 +3,7 @@
 Production: https://nextjs-dashboard-nine-theta-d8vctthkcs.vercel.app/
 
 ## What it is
-This program is used for medical staff to keep track of appointments. This can also help keep patient information organized and help keep track of their status of if they are coming or not
+This program is used for medical staff to keep track of appointments. This can also help keep patient information organized and help keep track of their status of if they are coming or not. useful when the user has many clinics to manage with different patients and schedule and the owner can see them all but the front desk gets to only see what is needed for them and their own patient and not another clinics patients.
 
 ## DEMO LOGINS (for reviewers)
 Email: owner@nextmail.com
