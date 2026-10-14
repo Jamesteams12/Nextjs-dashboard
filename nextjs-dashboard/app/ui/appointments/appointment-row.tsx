@@ -1,7 +1,12 @@
 'use client';
 
 import { useActionState } from 'react';
-import { deleteAppointment, updateAppointment, type AppointmentState } from '@/app/lib/actions';
+import {
+  deleteAppointment,
+  updateAppointment,
+  type AppointmentState,
+} from '@/app/lib/actions';
+import { clinicUtcDateTimeToLocal } from '@/app/lib/clinic-time';
 import type { Appointment, PatientOption } from '@/app/lib/data';
 
 export default function AppointmentRow({
@@ -15,9 +20,7 @@ export default function AppointmentRow({
   const updateWithId = updateAppointment.bind(null, appointment.id);
   const [state, formAction] = useActionState(updateWithId, initialState);
   const deleteWithId = deleteAppointment.bind(null, appointment.id);
-  const localDateTime = new Date(
-    new Date(appointment.starts_at).getTime() + 2 * 60 * 60 * 1000,
-  ).toISOString().slice(0, 16);
+  const localDateTime = clinicUtcDateTimeToLocal(appointment.starts_at) ?? '';
   const displayDateTime = new Intl.DateTimeFormat('en-ZA', {
     dateStyle: 'medium',
     timeStyle: 'short',

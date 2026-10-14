@@ -7,6 +7,7 @@ import postgres from 'postgres';
 import { AuthError } from 'next-auth';
 import { auth, signIn } from '@/auth';
 import { createClient } from '@/app/lib/supabase/server';
+import { clinicLocalDateTimeToUtc } from '@/app/lib/clinic-time';
 
 const sql = postgres(process.env.POSTGRES_URL!, {
   ssl: 'require',
@@ -238,13 +239,7 @@ const PatientSchema = z.object({
 });
 
 function isValidAppointmentDateTime(value: string) {
-  const timestamp = new Date(`${value}:00+02:00`);
-  return (
-    !Number.isNaN(timestamp.getTime()) &&
-    new Date(timestamp.getTime() + 2 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 16) === value
-  );
+  return clinicLocalDateTimeToUtc(value) !== null;
 }
 
 const AppointmentSchema = z.object({
@@ -314,7 +309,12 @@ async function requireClinicPatient(
 }
 
 function appointmentTimestamp(dateTimeLocal: string) {
-  return new Date(`${dateTimeLocal}:00+02:00`).toISOString();
+  const timestamp = clinicLocalDateTimeToUtc(dateTimeLocal);
+  if (!timestamp) {
+    throw new Error('Invalid appointment date and time.');
+  }
+
+  return timestamp;
 }
 
 export async function createAppointment(

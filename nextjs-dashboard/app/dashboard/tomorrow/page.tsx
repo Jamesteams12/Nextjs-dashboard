@@ -32,10 +32,11 @@ export default async function Page() {
                     {appointment.patient_name}
                   </p>
                   <p className="text-sm text-gray-500">
-                    {new Date(appointment.starts_at).toLocaleTimeString([], {
+                    {new Intl.DateTimeFormat('en-ZA', {
                       hour: '2-digit',
                       minute: '2-digit',
-                    })}
+                      timeZone: 'Africa/Johannesburg',
+                    }).format(new Date(appointment.starts_at))}
                   </p>
                 </div>
                 <div className="text-sm text-gray-700">
