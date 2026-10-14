@@ -7,14 +7,16 @@ import {
   type AppointmentState,
 } from '@/app/lib/actions';
 import { clinicUtcDateTimeToLocal } from '@/app/lib/clinic-time';
-import type { Appointment, PatientOption } from '@/app/lib/data';
+import type { Appointment, DoctorOption, PatientOption } from '@/app/lib/data';
 
 export default function AppointmentRow({
   appointment,
   patients,
+  doctors,
 }: {
   appointment: Appointment;
   patients: PatientOption[];
+  doctors: DoctorOption[];
 }) {
   const initialState: AppointmentState = { message: null, errors: {} };
   const updateWithId = updateAppointment.bind(null, appointment.id);
@@ -65,6 +67,20 @@ export default function AppointmentRow({
         )}
       </td>
       <td className="px-4 py-3">
+        <label className="sr-only" htmlFor={`doctor-${appointment.id}`}>Doctor</label>
+        <select
+          id={`doctor-${appointment.id}`}
+          name="doctor_id"
+          form={formId}
+          defaultValue={appointment.doctor_id}
+          className="rounded-md border border-gray-200 bg-white px-2 py-1 text-sm"
+        >
+          {doctors.map((doctor) => (
+            <option key={doctor.id} value={doctor.id}>{doctor.full_name}</option>
+          ))}
+        </select>
+      </td>
+      <td className="px-4 py-3">
         <label className="sr-only" htmlFor={`status-${appointment.id}`}>Status</label>
         <select
           id={`status-${appointment.id}`}
@@ -98,6 +114,7 @@ export default function AppointmentRow({
           {state.message}
           {state.errors?.starts_at?.join(' ')}
           {state.errors?.patient_id?.join(' ')}
+          {state.errors?.doctor_id?.join(' ')}
           {state.errors?.status?.join(' ')}
         </div>
       </td>

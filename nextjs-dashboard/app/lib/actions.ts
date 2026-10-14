@@ -244,6 +244,7 @@ function isValidAppointmentDateTime(value: string) {
 
 const AppointmentSchema = z.object({
   patient_id: z.string().uuid({ message: 'Please select a patient.' }),
+  doctor_id: z.string().uuid({ message: 'Please select a doctor.' }),
   starts_at: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/, {
@@ -269,6 +270,7 @@ export type PatientState = {
 export type AppointmentState = {
   errors?: {
     patient_id?: string[];
+    doctor_id?: string[];
     starts_at?: string[];
     status?: string[];
   };
@@ -308,6 +310,22 @@ async function requireClinicPatient(
   return data?.user_id ?? null;
 }
 
+async function requireClinicDoctor(doctorId: string) {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('doctors')
+    .select('id')
+    .eq('id', doctorId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Supabase error checking appointment doctor:', error);
+    throw new Error(`Database error ${error.code}: failed to verify doctor.`);
+  }
+
+  return data?.id ?? null;
+}
+
 function appointmentTimestamp(dateTimeLocal: string) {
   const timestamp = clinicLocalDateTimeToUtc(dateTimeLocal);
   if (!timestamp) {
@@ -324,6 +342,7 @@ export async function createAppointment(
   const { role, userId } = await requirePatientEditor();
   const validated = AppointmentSchema.safeParse({
     patient_id: formData.get('patient_id'),
+    doctor_id: formData.get('doctor_id'),
     starts_at: formData.get('starts_at'),
     status: formData.get('status'),
   });
@@ -347,10 +366,19 @@ export async function createAppointment(
     };
   }
 
+  const doctorId = await requireClinicDoctor(validated.data.doctor_id);
+  if (!doctorId) {
+    return {
+      errors: { doctor_id: ['Select a doctor from the clinic.'] },
+      message: 'Failed to create appointment.',
+    };
+  }
+
   const supabase = createClient();
   const { error } = await supabase.from('appointments').insert({
     user_id: patientOwnerId,
     patient_id: validated.data.patient_id,
+    doctor_id: doctorId,
     starts_at: appointmentTimestamp(validated.data.starts_at),
     status: validated.data.status,
   });
@@ -374,6 +402,7 @@ export async function updateAppointment(
   const { role, userId } = await requirePatientEditor();
   const validated = AppointmentSchema.safeParse({
     patient_id: formData.get('patient_id'),
+    doctor_id: formData.get('doctor_id'),
     starts_at: formData.get('starts_at'),
     status: formData.get('status'),
   });
@@ -397,12 +426,21 @@ export async function updateAppointment(
     };
   }
 
+  const doctorId = await requireClinicDoctor(validated.data.doctor_id);
+  if (!doctorId) {
+    return {
+      errors: { doctor_id: ['Select a doctor from the clinic.'] },
+      message: 'Failed to update appointment.',
+    };
+  }
+
   const supabase = createClient();
   let query = supabase
     .from('appointments')
     .update({
       user_id: patientOwnerId,
       patient_id: validated.data.patient_id,
+      doctor_id: doctorId,
       starts_at: appointmentTimestamp(validated.data.starts_at),
       status: validated.data.status,
     })

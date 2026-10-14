@@ -3,20 +3,22 @@
 import { useActionState } from 'react';
 import Link from 'next/link';
 import { createAppointment, type AppointmentState } from '@/app/lib/actions';
-import type { PatientOption } from '@/app/lib/data';
+import type { DoctorOption, PatientOption } from '@/app/lib/data';
 import { Button } from '@/app/ui/button';
 
 export default function CreateAppointmentForm({
   patients,
+  doctors,
 }: {
   patients: PatientOption[];
+  doctors: DoctorOption[];
 }) {
   const initialState: AppointmentState = { message: null, errors: {} };
   const [state, formAction] = useActionState(createAppointment, initialState);
 
   return (
     <form action={formAction} className="rounded-xl bg-gray-50 p-4">
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <div>
           <label htmlFor="patient_id" className="mb-2 block text-sm font-medium">
             Patient
@@ -36,6 +38,29 @@ export default function CreateAppointmentForm({
           </select>
           <div id="create-patient-error" aria-live="polite">
             {state.errors?.patient_id?.map((error) => (
+              <p className="mt-1 text-sm text-red-600" key={error}>{error}</p>
+            ))}
+          </div>
+        </div>
+        <div>
+          <label htmlFor="doctor_id" className="mb-2 block text-sm font-medium">
+            Doctor
+          </label>
+          <select
+            id="doctor_id"
+            name="doctor_id"
+            required
+            defaultValue=""
+            className="block w-full rounded-md border border-gray-200 bg-white px-3 py-2 text-sm"
+            aria-describedby="create-doctor-error"
+          >
+            <option value="" disabled>Select a doctor</option>
+            {doctors.map((doctor) => (
+              <option key={doctor.id} value={doctor.id}>{doctor.full_name}</option>
+            ))}
+          </select>
+          <div id="create-doctor-error" aria-live="polite">
+            {state.errors?.doctor_id?.map((error) => (
               <p className="mt-1 text-sm text-red-600" key={error}>{error}</p>
             ))}
           </div>
@@ -74,7 +99,9 @@ export default function CreateAppointmentForm({
           </select>
         </div>
         <div className="flex items-end">
-          <Button type="submit" disabled={patients.length === 0}>Add appointment</Button>
+          <Button type="submit" disabled={patients.length === 0 || doctors.length === 0}>
+            Add appointment
+          </Button>
         </div>
       </div>
       {!patients.length && (
@@ -83,6 +110,11 @@ export default function CreateAppointmentForm({
           <Link href="/dashboard/patients/create" className="text-blue-700 underline">
             Add patient
           </Link>
+        </p>
+      )}
+      {!doctors.length && (
+        <p className="mt-3 text-sm text-gray-600">
+          Add doctors before booking an appointment.
         </p>
       )}
       <div aria-live="polite" aria-atomic="true">

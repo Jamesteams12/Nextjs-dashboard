@@ -255,10 +255,12 @@ export type PatientGrowth = {
 export type Appointment = {
   id: string;
   patient_id: string;
+  doctor_id: string;
   starts_at: string;
   status: string;
   patient_name: string;
   patient_phone: string | null;
+  doctor_name: string;
 };
 
 export type AppointmentStatusSummary = {
@@ -269,6 +271,11 @@ export type AppointmentStatusSummary = {
 };
 
 export type PatientOption = Pick<Patient, 'id' | 'full_name'>;
+
+export type DoctorOption = {
+  id: string;
+  full_name: string;
+};
 
 export type ClinicMetrics = {
   newPatients: number;
@@ -371,7 +378,7 @@ export async function fetchAppointments(
   const access = await getCurrentPatientAccess();
   let query = supabase
     .from('appointments')
-    .select('id, patient_id, starts_at, status')
+    .select('id, patient_id, doctor_id, starts_at, status')
     .gte('starts_at', start.toISOString())
     .lt('starts_at', end.toISOString())
     .order('starts_at', { ascending: true });
@@ -387,10 +394,12 @@ export async function fetchAppointments(
 
   const appointments = data ?? [];
   const patientIds = [...new Set(appointments.map(({ patient_id }) => patient_id))];
+  const doctorIds = [...new Set(appointments.map(({ doctor_id }) => doctor_id))];
   const patientsById = new Map<
     string,
     { full_name: string; phone: string | null }
   >();
+  const doctorsById = new Map<string, string>();
 
   if (patientIds.length > 0) {
     let patientQuery = supabase
@@ -409,12 +418,26 @@ export async function fetchAppointments(
     for (const patient of patients ?? []) patientsById.set(patient.id, patient);
   }
 
+  if (doctorIds.length > 0) {
+    const { data: doctors, error: doctorError } = await supabase
+      .from('doctors')
+      .select('id, full_name')
+      .in('id', doctorIds);
+
+    if (doctorError) {
+      console.error('Supabase error:', doctorError);
+      throw new Error('Failed to fetch appointment doctors.');
+    }
+    for (const doctor of doctors ?? []) doctorsById.set(doctor.id, doctor.full_name);
+  }
+
   return appointments.map((appointment) => {
     const patient = patientsById.get(appointment.patient_id);
     return {
       ...appointment,
       patient_name: patient?.full_name ?? 'Patient unavailable',
       patient_phone: patient?.phone ?? null,
+      doctor_name: doctorsById.get(appointment.doctor_id) ?? 'Doctor unavailable',
     };
   });
 }
@@ -566,4 +589,19 @@ export async function fetchPatientOptions(): Promise<PatientOption[]> {
   }
 
   return patients;
+}
+
+export async function fetchDoctorOptions(): Promise<DoctorOption[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from('doctors')
+    .select('id, full_name')
+    .order('full_name', { ascending: true });
+
+  if (error) {
+    console.error('Supabase error:', error);
+    throw new Error('Failed to fetch doctors for appointment booking.');
+  }
+
+  return data ?? [];
 }

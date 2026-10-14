@@ -31,6 +31,10 @@ export default async function Page() {
                   <p className="text-lg font-semibold text-gray-900">
                     {appointment.patient_name}
                   </p>
+                  <p className="text-sm text-gray-700">
+                    <span className="font-medium text-gray-900">Doctor:</span>{' '}
+                    {appointment.doctor_name}
+                  </p>
                   <p className="text-sm text-gray-500">
                     {new Intl.DateTimeFormat('en-ZA', {
                       hour: '2-digit',

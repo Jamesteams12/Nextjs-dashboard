@@ -1,10 +1,28 @@
 create unique index if not exists patients_id_user_id_idx
   on public.patients (id, user_id);
 
+create table if not exists public.doctors (
+  id uuid primary key,
+  full_name text not null
+);
+
+insert into public.doctors (id, full_name)
+values
+  ('d0c70000-0000-4000-8000-000000000001', 'Dr. Maya Patel'),
+  ('d0c70000-0000-4000-8000-000000000002', 'Dr. Liam Nkosi')
+on conflict (id) do update
+set full_name = excluded.full_name;
+
+alter table public.doctors enable row level security;
+
+revoke all on table public.doctors from anon, authenticated;
+grant select on table public.doctors to service_role;
+
 create table public.appointments (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null,
   patient_id uuid not null,
+  doctor_id uuid not null references public.doctors (id),
   starts_at timestamptz not null,
   status text not null default 'booked'
     check (status in ('booked', 'done', 'no_show')),
@@ -22,4 +40,5 @@ grant select, insert, update, delete on table public.appointments to service_rol
 
 create index appointments_user_id_idx on public.appointments (user_id);
 create index appointments_patient_id_idx on public.appointments (patient_id);
+create index appointments_doctor_id_idx on public.appointments (doctor_id);
 create index appointments_starts_at_idx on public.appointments (starts_at);
