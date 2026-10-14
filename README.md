@@ -5,7 +5,7 @@ Production: https://nextjs-dashboard-nine-theta-d8vctthkcs.vercel.app/
 ## What it is
 This program is used for medical staff to keep track of appointments. This can also help keep patient information organized and help keep track of their status of if they are coming or not. useful when the user has many clinics to manage with different patients and schedule and the owner can see them all but the front desk gets to only see what is needed for them and their own patient and not another clinics patients.
 
-## DEMO LOGINS (for reviewers)
+## DEMO LOGINS (for reviewers only)
 Email: owner@nextmail.com
 Password: 123456
 
@@ -24,82 +24,34 @@ Password:frontdesk456
 4. Run pnpm dev and open http://localhost:3000.
 
 ## Smoke test (date, run on production as two users)
-- [ ] 1. Signed out, /dashboard redirects to login
-- [ ] 2. User one signs in and lands on /dashboard
-- [ ] 3. Entity one: create, edit, delete; list updates
-- [ ] 4. Entity two: create (select shows only my rows), edit, delete
-- [ ] 5. Both charts render from real rows, question as title
-- [ ] 6. User two (private window) sees none of user one's rows
-- [ ] 7. User two opening user one's edit URL gets not-found
-- [ ] 8. Empty create form shows messages, saves nothing
-- [ ] 9. Unknown URL shows the not-found page
-- [ ] 10. Sign out works; .env.local is not on GitHub
-- [ ] R. (only if shipped) Realtime: an insert in window A updates window B within a second
-- [ ] S. (only if shipped) Storage: upload and signed link work; user two cannot open user one's file; the bucket is private
+- [x] 1. Signed out, /dashboard redirects to login
+- [x] 2. User one signs in and lands on /dashboard
+- [x] 3. Entity one: create, edit, delete; list updates
+- [x] 4. Entity two: create (select shows only my rows), edit, delete
+- [x] 5. Both charts render from real rows, question as title
+- [x] 6. User two (private window) sees none of user one's rows
+- [x] 7. User two opening user one's edit URL gets not-found
+- [x] 8. Empty create form shows messages, saves nothing
+- [x] 9. Unknown URL shows the not-found page
+- [x] 10. Sign out works; .env.local is not on GitHub
 
 ## Freeze plan
-- A Today section: shows the appointments on the current day, only can see which it is today on the appointment section
+ 
+### Must ship today
+1. Fix: patients create, edit and delete work in production behind RLS.
+2. Fix: appointments create, edit and delete work in production; the patient select lists only my patients.
+3. Verify: both charts render from real rows with the question as title and labelled axes or legend.
+4. Verify: user two sees none of user one's rows, and user one's edit URL gives the not-found page.
+5. Ship: a "Today" section on the appointments page listing only today's appointments.
+### Cut
+- Treatments entity: cut because patients and appointments needed to be fully working behind RLS first, and a half-built third entity is worse than none.
+- Stretch (Realtime/Storage): cut so that nothing new starts on freeze day.
+- Preventing double-booked slots: cut because it needs a database constraint and a clear user message, which was out of scope for this week.
+### Monday polish
+1. Complete and date the smoke test in this README.
+2. Tidy the wording of empty states on both lists.
+3. Add a "so what" line under each chart if any is missing.
 
 ## Known gaps
-- Two Appointments can be blocked at the same time on the same day
-
-The demo login is a dedicated demo user with a throwaway password, never your real password: the README is public, so anything in it is published. Enter the seed rows while signed in as the demo user, because RLS shows each user only their own rows. Before you submit, sign in as it yourself in a private window.
-
-## 2. The production check
-
-1. Vercel → Project → Settings → Environment Variables: NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY have Production ticked. Vercel: "Any change you make to environment variables are not applied to previous deployments, they only apply to new deployments." Change one, then Redeploy.
-2. Vercel → Deployments: the newest Production row, built from main, reads Ready.
-3. Copy the domain from Settings → Domains, open it in a private window, and check it matches the Production line of your README.
-4. Sign in with the demo login exactly as the README spells it. Copy and paste; do not retype from memory.
-5. If you kept Realtime or Storage, run its check (R or S) on the production URL and run the three catalogue queries from Thursday's deploy block: the bucket is private, its policies exist, the table is in the publication. Delete your test files from the bucket.
-
-## 3. The one test every reviewer runs
-
-The reviewer signs in as a second user and looks for the first user's rows. Run it first: private window, user two, open both lists and both charts, then paste one of user one's edit URLs. User two should see nothing of user one's, and that edit URL should give the not-found page.
-
-## 4. No secrets in the repository
-
-Check that .env.local was never committed:
-
-```bash
-git ls-files | grep env
-```
-
-Only an example file of names may appear. Then open the repository on GitHub and confirm no .env.local is listed.
-
-Supabase's API keys page says the publishable key is "Safe to expose online", while a secret key: "Never put one in a browser, a shipped application, or source control." Next.js inlines every NEXT_PUBLIC_ value into the JavaScript sent to the browser, so a secret key must never sit in a NEXT_PUBLIC_ variable. If a secret key was committed, create a new one in Supabase (Settings → API Keys), replace it everywhere, then delete the old one.
-
-## 5. Get the blob link and submit
-
-On GitHub open README.md on main and copy the address bar. It has this shape:
-
-```text
-https://github.com/<you>/<repo>/blob/main/README.md
-```
-
-Submit that GitHub URL only, with the production URL at the top of the file.
-
-## If it goes wrong
-
-| Symptom | Fix |
-|---|---|
-| works locally, not in production | a variable missing for Production, or a type error: run pnpm build locally, fix, push, Redeploy |
-| demo login fails | the user was created in a different Supabase project from the one production uses, or the email is unconfirmed |
-| charts empty in production | the seed rows belong to another user; sign in as the demo user and enter them again |
-
-## Key takeaways
-
-- The README is the reviewer's first screen: title, production URL, demo login.
-- Variable names in the README, never values.
-- A tick means: on production, today, as the right user.
-- Publishable key in the browser, secret key never.
-
-## References
-
-- Vercel environment variables: https://vercel.com/docs/environment-variables
-- Supabase API keys: https://supabase.com/docs/guides/api/api-keys
-- Next.js environment variables: https://nextjs.org/docs/app/guides/environment-variables
-- GitHub, URLs to files: https://docs.github.com/en/repositories/working-with-files/using-files/getting-permanent-links-to-files
-- git ls-files: https://git-scm.com/docs/git-ls-files
-
-This repository intentionally reuses the dashboard starter as a template for a different site. The course README inside nextjs-dashboard/README.md is not the project README for this new site.
+- Two Appointments can be blocked at the same time on the same day.
+- Treatments entity and the Realtime/Storage stretch were not built.
