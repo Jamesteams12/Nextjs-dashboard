@@ -32,6 +32,15 @@ The demo accounts seeded by `POST /seed` are:
 | Front desk | `frontdesk@nextmail.com` | `frontdesk123` | `6f26a2d8-3f8d-44a9-9d52-3d7f4b0d7c7f` |
 | Front desk | `frontdesk2@nextmail.com` | `frontdesk456` | `aa6ff0e4-5a6d-47f8-9c1a-7c8ddc1e9a23` |
 
+## Demo setup on a new device
+
+Configure the app's environment variables for the Supabase project, start the
+app with `NODE_ENV=development`, and send `POST /seed` once to create the demo
+staff accounts and invoice data. Then run
+[`demo_setup.sql`](../supabase/demo_setup.sql) in that project's Supabase SQL
+Editor. The script creates or updates the clinic patient and appointment
+tables and adds repeatable demo records, including appointments for tomorrow.
+
 This app uses NextAuth credentials, not Supabase Auth. Consequently
 `auth.uid()` is not the login's user ID here (and is null for SQL Editor
 queries). Server-side Supabase calls use the service-role key, so row access is
@@ -39,8 +48,6 @@ scoped by the authenticated NextAuth user ID in the server queries/actions.
 Existing patients retain their current `user_id`; records previously assigned
 to the owner cannot be attributed to a front-desk account automatically.
 
-To add a repeatable sample patient and upcoming appointment to each front-desk
-account, run
-[`demo_front_desk_data.sql`](./app/lib/supabase/demo_front_desk_data.sql) in the
-Supabase SQL Editor after both accounts exist in `public.users`. Each front-desk
-login will see its own sample patient and appointment; the owner can see both.
+For an existing installation, the standalone
+[`demo_front_desk_data.sql`](./app/lib/supabase/demo_front_desk_data.sql) can
+still be used to add only front-desk sample records.
